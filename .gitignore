@@ -1,0 +1,7 @@
+# Interne Entwicklungsdateien
+internal/
+plans/
+.codex
+*.json
+*.log
+.DS_Store

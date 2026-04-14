@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schatten-Jäger - Professional Web Edition</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="hud" class="hidden">
+            <div class="hud-item" id="hud-level">Level: 1</div>
+            <div class="hud-item" id="hud-target">Ziel: 50 Pkt</div>
+            <div class="hud-item" id="hud-score">Score: 0</div>
+        </div>
+
+        <div id="joystick-left" class="joystick-container">
+            <div class="joystick-base"></div>
+            <div class="joystick-thumb"></div>
+        </div>
+        <div id="joystick-right" class="joystick-container">
+            <div class="joystick-base"></div>
+            <div class="joystick-thumb"></div>
+        </div>
+
+        <div id="menu-overlay" class="overlay">
+            <div class="ui-panel">
+                <h1 class="title-main">SCHATTEN-JÄGER</h1>
+                <p class="text-small">Nutze das Licht, um Feinde im Schatten zu vernichten.</p>
+                
+                <div class="mode-selection">
+                    <div id="mode-solo" class="mode-card selected" onclick="game.setMode('SOLO')">
+                        <h3 class="margin-v-10">SOLO</h3>
+                        <p class="controls-hint">Du bist das Licht.<br>WASD / Pfeile</p>
+                    </div>
+                    <div id="mode-coop" class="mode-card" onclick="game.setMode('COOP')">
+                        <h3 class="margin-v-10">KOOP</h3>
+                        <p class="controls-hint">P1: WASD (Laufen)<br>P2: Pfeile (Licht)</p>
+                    </div>
+                </div>
+
+                <button id="main-start-btn" onclick="game.startLevel(game.saveData.unlockedLevel)">SPIEL STARTEN</button>
+                <button id="audio-init-btn" class="btn-audio" onclick="game.initAudio()">Audio aktivieren</button>
+                
+                <h3 class="title-sub">Levelauswahl</h3>
+                <div id="level-select"></div>
+            </div>
+        </div>
+
+        <div id="win-overlay" class="overlay hidden">
+            <div class="ui-panel">
+                <h1 class="text-success title-main">LEVEL GESCHAFFT!</h1>
+                <p id="win-msg" class="margin-v-10">Ziel erreicht.</p>
+                <div id="win-best-msg" class="text-success margin-v-20"></div>
+                <button onclick="game.nextLevel()">Nächstes Level</button>
+                <button onclick="game.showMenu()">Menü</button>
+            </div>
+        </div>
+
+        <div id="lose-overlay" class="overlay hidden">
+            <div class="ui-panel">
+                <h1 id="lose-title" class="text-danger title-main">GESTORBEN!</h1>
+                <p id="lose-msg" class="margin-v-20">Die Dunkelheit hat dich eingeholt.</p>
+                <button onclick="game.retry()">Nochmal</button>
+                <button onclick="game.showMenu()">Menü</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script-Reihenfolge ist wichtig, da game.js auf LEVELS zugreift -->
+    <script src="levels.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
