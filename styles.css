@@ -13,6 +13,7 @@ body {
     color: var(--primary);
     font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     user-select: none;
+    touch-action: none;
 }
 
 #game-container {
@@ -140,6 +141,7 @@ button:active { transform: scale(0.95); }
     pointer-events: none;
     display: none;
     z-index: 20;
+    opacity: 0.95;
 }
 
 .joystick-base {

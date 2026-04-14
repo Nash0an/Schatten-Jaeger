@@ -7,7 +7,7 @@ In **Schatten-Jäger** steuerst du eine Lichtquelle in einer dunklen Welt. In de
 
 ## Features
 - **Einzigartige Mechanik:** Nutze Licht und Schatten strategisch zur Abwehr von Gegnern.
-- **30 Herausfordernde Level:** Verschiedene Missionstypen wie *Highscore*, *Überleben* und *Pazifist*.
+- **31 Herausfordernde Level:** Verschiedene Missionstypen wie *Highscore*, *Überleben* und *Pazifist*.
 - **Dynamische Umgebungen:** Sich bewegende Säulen, schrumpfende Schatten und flackerndes Licht.
 - **Koop-Modus:** Spiele gemeinsam mit einem Freund – einer bewegt die Figur, der andere steuert den Lichtkegel.
 - **Progression:** Schalte neue Level frei und verbessere deine Bestzeiten. Alle Fortschritte werden lokal gespeichert.
@@ -22,11 +22,11 @@ In **Schatten-Jäger** steuerst du eine Lichtquelle in einer dunklen Welt. In de
   - **Spieler 2 (Lichtkegel)**: Pfeiltasten
 
 ### Mobil (Touch)
-Das Spiel erkennt automatisch, wenn du ein Touch-Gerät verwendest, und zeigt dynamische "Floating Joysticks" an:
-- **Solo-Modus**: Tippe irgendwo auf den Bildschirm, um einen virtuellen Joystick zur Bewegung zu erzeugen.
+Das Spiel erkennt automatisch, wenn du ein Touch-Gerät verwendest, und blendet feste virtuelle Joysticks ein:
+- **Solo-Modus**: Ein linker Joystick erscheint dauerhaft unten links und steuert die Bewegung.
 - **Koop-Modus**: 
-  - **Linke Bildschirmhälfte**: Spieler 1 (Bewegung).
-  - **Rechte Bildschirmhälfte**: Spieler 2 (Lichtkegel-Rotation).
+  - **Unten links**: Spieler 1 (Bewegung).
+  - **Unten rechts**: Spieler 2 (Lichtkegel-Rotation).
 
 ## Installation & Start
 Keine Installation erforderlich! Öffne einfach die `index.html` in einem modernen Webbrowser deiner Wahl.

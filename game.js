@@ -20,10 +20,9 @@ class SchattenJaeger {
 
         // Touch Data
         this.isTouchDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
-        this.touches = {}; // Store active touches by identifier
         this.joystickData = {
-            left: { active: false, startX: 0, startY: 0, currentX: 0, currentY: 0, vectorX: 0, vectorY: 0 },
-            right: { active: false, startX: 0, startY: 0, currentX: 0, currentY: 0, vectorX: 0, vectorY: 0 }
+            left: { visible: false, active: false, id: null, centerX: 0, centerY: 0, vectorX: 0, vectorY: 0 },
+            right: { visible: false, active: false, id: null, centerX: 0, centerY: 0, vectorX: 0, vectorY: 0 }
         };
 
         this.player = { x: 0, y: 0, radius: 10, speed: 5 };
@@ -103,69 +102,118 @@ class SchattenJaeger {
             window.addEventListener('touchstart', (e) => this.handleTouch(e), { passive: false });
             window.addEventListener('touchmove', (e) => this.handleTouch(e), { passive: false });
             window.addEventListener('touchend', (e) => this.handleTouch(e), { passive: false });
+            window.addEventListener('touchcancel', (e) => this.handleTouch(e), { passive: false });
         }
+    }
+
+    getJoystickCenter(side) {
+        const horizontalOffset = 110;
+        const bottomOffset = 110;
+        return {
+            x: side === 'left' ? horizontalOffset : this.canvas.width - horizontalOffset,
+            y: this.canvas.height - bottomOffset
+        };
+    }
+
+    configureTouchControls() {
+        if (!this.isTouchDevice) return;
+
+        const showRight = this.state === 'PLAYING' && this.gameMode === 'COOP';
+        const showLeft = this.state === 'PLAYING';
+
+        ['left', 'right'].forEach(side => {
+            const data = this.joystickData[side];
+            const center = this.getJoystickCenter(side);
+            data.centerX = center.x;
+            data.centerY = center.y;
+            data.visible = side === 'left' ? showLeft : showRight;
+
+            if (!data.visible) {
+                data.active = false;
+                data.id = null;
+                data.vectorX = 0;
+                data.vectorY = 0;
+            }
+
+            this.updateJoystickUI(side);
+        });
+    }
+
+    getJoystickTouchSide(x, y) {
+        const activationRadius = 70;
+
+        for (const side of ['left', 'right']) {
+            const data = this.joystickData[side];
+            if (!data.visible || data.active) continue;
+
+            const dx = x - data.centerX;
+            const dy = y - data.centerY;
+            if (Math.sqrt(dx * dx + dy * dy) <= activationRadius) {
+                return side;
+            }
+        }
+
+        return null;
+    }
+
+    updateJoystickVector(side, x, y) {
+        const data = this.joystickData[side];
+        const maxRadius = 40;
+        const dx = x - data.centerX;
+        const dy = y - data.centerY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist > 0) {
+            const limitedDist = Math.min(dist, maxRadius);
+            data.vectorX = (dx / dist) * (limitedDist / maxRadius);
+            data.vectorY = (dy / dist) * (limitedDist / maxRadius);
+        } else {
+            data.vectorX = 0;
+            data.vectorY = 0;
+        }
+
+        this.updateJoystickUI(side);
+    }
+
+    releaseJoystick(side) {
+        const data = this.joystickData[side];
+        data.active = false;
+        data.id = null;
+        data.vectorX = 0;
+        data.vectorY = 0;
+        this.updateJoystickUI(side);
     }
 
     handleTouch(e) {
         if (this.state !== 'PLAYING') return;
         e.preventDefault();
-        
-        const touches = e.changedTouches;
-        const maxRadius = 40;
 
+        const touches = e.changedTouches;
         for (let i = 0; i < touches.length; i++) {
             const touch = touches[i];
             const tx = touch.clientX;
             const ty = touch.clientY;
-            
+
             if (e.type === 'touchstart') {
-                const isLeft = tx < window.innerWidth / 2;
-                const side = (isLeft || this.gameMode === 'SOLO') ? 'left' : 'right';
-                
-                // Don't start another joystick on the same side if already active
-                if (!this.joystickData[side].active) {
-                    this.joystickData[side] = {
-                        active: true,
-                        id: touch.identifier,
-                        startX: tx,
-                        startY: ty,
-                        currentX: tx,
-                        currentY: ty,
-                        vectorX: 0,
-                        vectorY: 0
-                    };
-                    this.updateJoystickUI(side);
+                const side = this.getJoystickTouchSide(tx, ty);
+                if (side) {
+                    const data = this.joystickData[side];
+                    data.active = true;
+                    data.id = touch.identifier;
+                    this.updateJoystickVector(side, tx, ty);
                 }
             } else if (e.type === 'touchmove') {
-                for (let side in this.joystickData) {
+                for (const side in this.joystickData) {
                     const data = this.joystickData[side];
                     if (data.active && data.id === touch.identifier) {
-                        data.currentX = tx;
-                        data.currentY = ty;
-                        
-                        const dx = data.currentX - data.startX;
-                        const dy = data.currentY - data.startY;
-                        const dist = Math.sqrt(dx * dx + dy * dy);
-                        
-                        if (dist > 0) {
-                            const limitedDist = Math.min(dist, maxRadius);
-                            data.vectorX = (dx / dist) * (limitedDist / maxRadius);
-                            data.vectorY = (dy / dist) * (limitedDist / maxRadius);
-                        } else {
-                            data.vectorX = 0;
-                            data.vectorY = 0;
-                        }
-                        this.updateJoystickUI(side);
+                        this.updateJoystickVector(side, tx, ty);
                     }
                 }
             } else if (e.type === 'touchend' || e.type === 'touchcancel') {
-                for (let side in this.joystickData) {
+                for (const side in this.joystickData) {
                     const data = this.joystickData[side];
                     if (data.active && data.id === touch.identifier) {
-                        data.active = false;
-                        data.vectorX = 0;
-                        data.vectorY = 0;
-                        this.updateJoystickUI(side);
+                        this.releaseJoystick(side);
                     }
                 }
             }
@@ -177,19 +225,19 @@ class SchattenJaeger {
         const container = document.getElementById(`joystick-${side}`);
         if (!container) return;
 
-        if (!data.active) {
+        if (!data.visible) {
             container.style.display = 'none';
             return;
         }
 
         container.style.display = 'block';
-        container.style.left = `${data.startX}px`;
-        container.style.top = `${data.startY}px`;
+        container.style.left = `${data.centerX}px`;
+        container.style.top = `${data.centerY}px`;
 
         const thumb = container.querySelector('.joystick-thumb');
         const maxRadius = 40;
-        const tx = data.vectorX * maxRadius;
-        const ty = data.vectorY * maxRadius;
+        const tx = (data.active ? data.vectorX : 0) * maxRadius;
+        const ty = (data.active ? data.vectorY : 0) * maxRadius;
         thumb.style.transform = `translate(-50%, -50%) translate(${tx}px, ${ty}px)`;
     }
 
@@ -197,6 +245,7 @@ class SchattenJaeger {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
         this.updatePillarPos();
+        this.configureTouchControls();
     }
 
     updatePillarPos() {
@@ -233,6 +282,7 @@ class SchattenJaeger {
         this.state = 'MENU';
         this.updateUI();
         this.updateLevelSelect();
+        this.configureTouchControls();
     }
 
     startLevel(id) {
@@ -252,6 +302,7 @@ class SchattenJaeger {
         this.updatePillarPos();
         this.state = 'PLAYING';
         this.updateUI();
+        this.configureTouchControls();
     }
 
     retry() { this.startLevel(LEVELS[this.currentLevelIdx].id); }
@@ -517,12 +568,7 @@ class SchattenJaeger {
     lose(msg) { 
         this.state = 'LOSE'; 
         this.playLoseSound(); 
-        
-        // Hide Joysticks
-        this.joystickData.left.active = false;
-        this.joystickData.right.active = false;
-        this.updateJoystickUI('left');
-        this.updateJoystickUI('right');
+        this.configureTouchControls();
 
         const loseMsg = document.getElementById('lose-msg');
         if (loseMsg) loseMsg.innerText = msg; 
@@ -531,12 +577,7 @@ class SchattenJaeger {
 
     win() {
         this.state = 'WIN'; this.playWinSound();
-
-        // Hide Joysticks
-        this.joystickData.left.active = false;
-        this.joystickData.right.active = false;
-        this.updateJoystickUI('left');
-        this.updateJoystickUI('right');
+        this.configureTouchControls();
 
         const lvl = LEVELS[this.currentLevelIdx];
         const currentVal = lvl.targetType === 'score' ? this.score : this.timer;
