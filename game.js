@@ -14,6 +14,7 @@ class SchattenJaeger {
         this.timer = 0;
         this.enemies = [];
         this.particles = [];
+        this.comboGroups = [];
         this.keys = {};
         this.shake = 0;
 
@@ -285,6 +286,81 @@ class SchattenJaeger {
         }
     }
 
+    calcComboPoints(groupSize) {
+        return 10 * Math.pow(2, groupSize - 1);
+    }
+
+    getComboColor(groupSize) {
+        if (groupSize === 1) return '#ff4444';
+        if (groupSize === 2) return '#ff8844';
+        if (groupSize === 3) return '#ffcc44';
+        return '#44ff44';
+    }
+
+    findOrCreateComboGroup(newEnemyIndex) {
+        const newEnemy = this.enemies[newEnemyIndex];
+        let mergedGroups = [];
+        let groupIndex = -1;
+
+        for (let i = 0; i < this.comboGroups.length; i++) {
+            const group = this.comboGroups[i];
+            for (const idx of group) {
+                const e = this.enemies[idx];
+                if (!e) continue;
+                const dist = Math.sqrt((newEnemy.x - e.x) ** 2 + (newEnemy.y - e.y) ** 2);
+                if (dist < newEnemy.radius + e.radius) {
+                    if (groupIndex === -1) groupIndex = i;
+                    mergedGroups.push(i);
+                    break;
+                }
+            }
+        }
+
+        if (mergedGroups.length > 0) {
+            let allIndices = [];
+            for (const gi of mergedGroups) {
+                allIndices = allIndices.concat(this.comboGroups[gi]);
+            }
+            allIndices.push(newEnemyIndex);
+            
+            for (let i = mergedGroups.length - 1; i >= 0; i--) {
+                this.comboGroups.splice(mergedGroups[i], 1);
+            }
+            this.comboGroups.push(allIndices);
+            
+            for (const idx of allIndices) {
+                if (this.enemies[idx]) {
+                    this.enemies[idx].comboSize = allIndices.length;
+                }
+            }
+            return;
+        }
+
+        this.comboGroups.push([newEnemyIndex]);
+        this.enemies[newEnemyIndex].comboSize = 1;
+    }
+
+    removeFromComboGroups(enemyIndex) {
+        for (let i = this.comboGroups.length - 1; i >= 0; i--) {
+            const group = this.comboGroups[i];
+            const pos = group.indexOf(enemyIndex);
+            if (pos !== -1) {
+                group.splice(pos, 1);
+                for (const idx of group) {
+                    if (this.enemies[idx]) {
+                        this.enemies[idx].comboSize = group.length;
+                    }
+                }
+                if (group.length <= 1) {
+                    this.comboGroups.splice(i, 1);
+                    if (this.enemies[group[0]]) {
+                        this.enemies[group[0]].comboSize = 1;
+                    }
+                }
+            }
+        }
+    }
+
     getShadowPoly() {
         if (!this.isLightOn) return null;
         const px=this.player.x, py=this.player.y, cx=this.pillar.x, cy=this.pillar.y, r=this.pillar.radius;
@@ -391,7 +467,9 @@ class SchattenJaeger {
             else if(side===1){ex=this.canvas.width+20; ey=Math.random()*this.canvas.height;}
             else if(side===2){ex=Math.random()*this.canvas.width; ey=this.canvas.height+20;}
             else {ex=-20; ey=Math.random()*this.canvas.height;}
-            this.enemies.push({ x: ex, y: ey, radius: 12, speed: currentEnemySpeed });
+            const newEnemy = { x: ex, y: ey, radius: 12, speed: currentEnemySpeed };
+            this.enemies.push(newEnemy);
+            this.findOrCreateComboGroup(this.enemies.length - 1);
         }
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const e = this.enemies[i];
@@ -405,12 +483,22 @@ class SchattenJaeger {
                 e.y += (edy/edist) * e.speed;
             }
             if (shadow && this.isPointInPoly(e, shadow)) {
-                this.score += 10; this.shake = 10; this.playKillSound();
-                for(let j=0; j<8; j++) this.particles.push({x:e.x, y:e.y, vx:(Math.random()-0.5)*10, vy:(Math.random()-0.5)*10, life:1.0});
-                this.enemies.splice(i, 1);
-                if (lvl.targetType === 'pacifist' && this.score > lvl.maxScore) {
-                    this.lose("Pazifist-Ziel gescheitert!");
-                    return;
+                const distToPillar = Math.sqrt((e.x - this.pillar.x) ** 2 + (e.y - this.pillar.y) ** 2);
+                const withinKillRadius = lvl.shadowKillRadius === undefined || lvl.shadowKillRadius === null || distToPillar <= lvl.shadowKillRadius;
+                
+                if (withinKillRadius) {
+                    const comboSize = this.getComboGroupSize(i);
+                    const points = this.calcComboPoints(comboSize);
+                    this.score += points;
+                    this.shake = 10;
+                    this.playKillSound();
+                    for (let j = 0; j < 8; j++) this.particles.push({ x: e.x, y: e.y, vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.5) * 10, life: 1.0 });
+                    this.removeFromComboGroups(i);
+                    this.enemies.splice(i, 1);
+                    if (lvl.targetType === 'pacifist' && this.score > lvl.maxScore) {
+                        this.lose("Pazifist-Ziel gescheitert!");
+                        return;
+                    }
                 }
             }
         }
@@ -473,7 +561,18 @@ class SchattenJaeger {
         if (poly) { this.ctx.fillStyle = 'rgba(35, 35, 35, 0.8)'; this.ctx.beginPath(); this.ctx.moveTo(poly[0].x, poly[0].y); poly.forEach(pt => this.ctx.lineTo(pt.x, pt.y)); this.ctx.fill(); }
         this.ctx.fillStyle = '#111'; this.ctx.beginPath(); this.ctx.arc(this.pillar.x, this.pillar.y, this.pillar.radius, 0, Math.PI*2); this.ctx.fill(); this.ctx.strokeStyle = '#333'; this.ctx.stroke();
         this.particles.forEach(p => { this.ctx.fillStyle = `rgba(255, 100, 100, ${p.life})`; this.ctx.fillRect(p.x, p.y, 2, 2); });
-        this.enemies.forEach(e => { this.ctx.fillStyle = '#ff4444'; this.ctx.shadowBlur = 15; this.ctx.shadowColor = '#ff4444'; this.ctx.beginPath(); this.ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2); this.ctx.fill(); this.ctx.shadowBlur = 0; });
+        this.enemies.forEach(e => { 
+            const comboSize = e.comboSize || 1;
+            const color = this.getComboColor(comboSize);
+            const glowIntensity = 15 + (comboSize - 1) * 5;
+            this.ctx.fillStyle = color; 
+            this.ctx.shadowBlur = glowIntensity; 
+            this.ctx.shadowColor = color; 
+            this.ctx.beginPath(); 
+            this.ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2); 
+            this.ctx.fill(); 
+            this.ctx.shadowBlur = 0; 
+        });
         if (this.isLightOn) {
             if (this.gameMode === 'SOLO') {
                 const grad = this.ctx.createRadialGradient(this.player.x, this.player.y, 0, this.player.x, this.player.y, 350);
