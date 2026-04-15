@@ -13,6 +13,7 @@
         <div id="hud" class="hidden">
             <div class="hud-item" id="hud-level">Level: 1</div>
             <div class="hud-item" id="hud-target">Ziel: 50 Pkt</div>
+            <div class="hud-item" id="hud-timer">Zeit: 00:00.0</div>
             <div class="hud-item" id="hud-score">Score: 0</div>
         </div>
 
@@ -31,17 +32,17 @@
                 <p class="text-small">Nutze das Licht, um Feinde im Schatten zu vernichten.</p>
                 
                 <div class="mode-selection">
-                    <div id="mode-solo" class="mode-card selected" onclick="game.setMode('SOLO')">
+                    <button id="mode-solo" class="mode-card selected" type="button" onclick="game.setMode('SOLO')">
                         <h3 class="margin-v-10">SOLO</h3>
                         <p class="controls-hint">Du bist das Licht.<br>WASD / Pfeile</p>
-                    </div>
-                    <div id="mode-coop" class="mode-card" onclick="game.setMode('COOP')">
+                    </button>
+                    <button id="mode-coop" class="mode-card" type="button" onclick="game.setMode('COOP')">
                         <h3 class="margin-v-10">KOOP</h3>
                         <p class="controls-hint">P1: WASD (Laufen)<br>P2: Pfeile (Licht)</p>
-                    </div>
+                    </button>
                 </div>
 
-                <button id="main-start-btn" onclick="game.startLevel(game.saveData.unlockedLevel)">SPIEL STARTEN</button>
+                <button id="main-start-btn" onclick="game.startLevel(game.getHighestSelectableLevel())">SPIEL STARTEN</button>
                 <button id="audio-init-btn" class="btn-audio" onclick="game.initAudio()">Audio aktivieren</button>
                 
                 <h3 class="title-sub">Levelauswahl</h3>

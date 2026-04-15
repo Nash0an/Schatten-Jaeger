@@ -93,15 +93,21 @@ button:active { transform: scale(0.95); }
 }
 
 .mode-card {
+    appearance: none;
+    background: transparent;
+    color: inherit;
     border: 1px solid #444;
     padding: 12px;
     border-radius: 10px;
     flex: 1;
     cursor: pointer;
     transition: all 0.2s;
+    margin: 0;
+    transform: none;
 }
 
 .mode-card:hover { border-color: var(--primary); background: #222; }
+.mode-card:active { transform: none; }
 .mode-card.selected { border-color: #44ff44; background: #1a2a1a; box-shadow: 0 0 15px rgba(68, 255, 68, 0.2); }
 
 #level-select {

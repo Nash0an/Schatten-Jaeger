@@ -5,7 +5,9 @@ class SchattenJaeger {
         this.audioCtx = null;
 
         const saved = localStorage.getItem('sj_v2_data');
-        this.saveData = saved ? JSON.parse(saved) : { unlockedLevel: 1, bests: {} };
+        this.saveData = saved ? JSON.parse(saved) : { unlockedLevel: 0, bests: {} };
+        this.masterModeActive = false;
+        this.restoreProgressFromBests();
 
         this.state = 'MENU';
         this.gameMode = 'SOLO';
@@ -16,10 +18,14 @@ class SchattenJaeger {
         this.particles = [];
         this.comboGroups = [];
         this.keys = {};
+        this.keyBuffer = ""; // Für das Passwort
         this.shake = 0;
+        this.spawnTimer = 0;
+        this.missionSplashTimer = 0;
 
         // Touch Data
-        this.isTouchDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+        this.isTouchDevice = false; // Startet immer als false
+        this.touchInitialized = false;
         this.joystickData = {
             left: { visible: false, active: false, id: null, centerX: 0, centerY: 0, vectorX: 0, vectorY: 0 },
             right: { visible: false, active: false, id: null, centerX: 0, centerY: 0, vectorX: 0, vectorY: 0 }
@@ -46,18 +52,68 @@ class SchattenJaeger {
         }
     }
 
+    getLastLevelId() {
+        return LEVELS[LEVELS.length - 1].id;
+    }
+
+    getHighestCompletedLevel() {
+        const completedIds = Object.keys(this.saveData.bests)
+            .map((id) => Number(id))
+            .filter((id) => Number.isInteger(id));
+        if (completedIds.length === 0) return -1;
+        return Math.max(...completedIds);
+    }
+
+    restoreProgressFromBests() {
+        const highestCompleted = this.getHighestCompletedLevel();
+        const recoveredUnlockedLevel = Math.min(highestCompleted + 1, this.getLastLevelId());
+
+        if (typeof this.saveData.unlockedLevel !== 'number' || Number.isNaN(this.saveData.unlockedLevel)) {
+            this.saveData.unlockedLevel = 0;
+        }
+
+        if (this.saveData.unlockedLevel > recoveredUnlockedLevel) {
+            this.saveData.unlockedLevel = recoveredUnlockedLevel;
+            localStorage.setItem('sj_v2_data', JSON.stringify(this.saveData));
+        }
+    }
+
+    getHighestSelectableLevel() {
+        return this.masterModeActive ? this.getLastLevelId() : Math.min(this.saveData.unlockedLevel, this.getLastLevelId());
+    }
+
+    initTouch() {
+        if (this.touchInitialized) return;
+        this.isTouchDevice = true;
+        this.touchInitialized = true;
+        
+        window.addEventListener('touchstart', (e) => this.handleTouch(e), { passive: false });
+        window.addEventListener('touchmove', (e) => this.handleTouch(e), { passive: false });
+        window.addEventListener('touchend', (e) => this.handleTouch(e), { passive: false });
+        window.addEventListener('touchcancel', (e) => this.handleTouch(e), { passive: false });
+        
+        this.configureTouchControls();
+    }
     playKillSound() {
         if (!this.audioCtx) return;
-        const osc = this.audioCtx.createOscillator();
-        const gain = this.audioCtx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(400, this.audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(50, this.audioCtx.currentTime + 0.1);
-        gain.gain.setValueAtTime(0.1, this.audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.1);
-        osc.connect(gain); gain.connect(this.audioCtx.destination);
-        osc.start(); osc.stop(this.audioCtx.currentTime + 0.1);
+        const now = this.audioCtx.currentTime;
+        const variation = 0.95 + Math.random() * 0.1; // +/- 5% Pitch
+        const frequencies = [659.25 * variation, 1318.51 * variation]; 
+
+        frequencies.forEach((freq, i) => {
+            const osc = this.audioCtx.createOscillator();
+            const gain = this.audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + i * 0.005); // Minimales Arpeggio
+            gain.gain.setValueAtTime(0.08, now + i * 0.005);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.005 + 0.15);
+            osc.connect(gain);
+            gain.connect(this.audioCtx.destination);
+            osc.start(now + i * 0.005);
+            osc.stop(now + i * 0.005 + 0.15);
+        });
     }
+
 
     playWinSound() {
         if (!this.audioCtx) return;
@@ -95,16 +151,78 @@ class SchattenJaeger {
 
     bindEvents() {
         window.addEventListener('resize', () => this.resize());
-        window.addEventListener('keydown', (e) => this.keys[e.code] = true);
+        window.addEventListener('keydown', (e) => {
+            this.keys[e.code] = true;
+            
+            // Passwort-Erkennung (nur im Menü)
+            if (this.state === 'MENU') {
+                this.keyBuffer += e.key.toLowerCase();
+                if (this.keyBuffer.length > 20) this.keyBuffer = this.keyBuffer.substring(1);
+                
+                if (this.keyBuffer.endsWith("angimylove")) {
+                    this.activateMasterMode();
+                    this.keyBuffer = "";
+                } else if (this.keyBuffer.endsWith("exit")) {
+                    this.deactivateMasterMode();
+                    this.keyBuffer = "";
+                }
+            }
+        });
         window.addEventListener('keyup', (e) => this.keys[e.code] = false);
 
-        if (this.isTouchDevice) {
-            window.addEventListener('touchstart', (e) => this.handleTouch(e), { passive: false });
-            window.addEventListener('touchmove', (e) => this.handleTouch(e), { passive: false });
-            window.addEventListener('touchend', (e) => this.handleTouch(e), { passive: false });
-            window.addEventListener('touchcancel', (e) => this.handleTouch(e), { passive: false });
+        const soloCard = document.getElementById('mode-solo');
+        const coopCard = document.getElementById('mode-coop');
+        if (soloCard) soloCard.addEventListener('pointerup', () => this.setMode('SOLO'));
+        if (coopCard) coopCard.addEventListener('pointerup', () => this.setMode('COOP'));
+
+        // Globaler Touch-Listener zur Aktivierung der Touch-Steuerung
+        window.addEventListener('touchstart', () => this.initTouch(), { once: true });
+    }
+
+    activateMasterMode() {
+        this.masterModeActive = true;
+        this.updateLevelSelect();
+        
+        // Visuelles Feedback
+        const startBtn = document.getElementById('main-start-btn');
+        if (startBtn) {
+            startBtn.innerText = "MEISTER-MODUS AKTIVIERT!";
+            startBtn.style.background = "#44ff44";
+            setTimeout(() => {
+                startBtn.style.background = "";
+                this.updateLevelSelect();
+            }, 2000);
+        }
+        
+        // Kurzer Bestätigungssound
+        if (this.audioCtx) {
+            const osc = this.audioCtx.createOscillator();
+            const gain = this.audioCtx.createGain();
+            osc.frequency.setValueAtTime(880, this.audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, this.audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.5);
+            osc.connect(gain); gain.connect(this.audioCtx.destination);
+            osc.start(); osc.stop(this.audioCtx.currentTime + 0.5);
         }
     }
+
+    deactivateMasterMode() {
+        if (!this.masterModeActive) return;
+
+        this.masterModeActive = false;
+        this.updateLevelSelect();
+
+        const startBtn = document.getElementById('main-start-btn');
+        if (startBtn) {
+            startBtn.innerText = "MEISTER-MODUS BEENDET";
+            startBtn.style.background = "#444";
+            setTimeout(() => {
+                startBtn.style.background = "";
+                this.updateLevelSelect();
+            }, 1500);
+        }
+    }
+
 
     getJoystickCenter(side) {
         const horizontalOffset = 110;
@@ -259,11 +377,12 @@ class SchattenJaeger {
     updateLevelSelect() {
         const container = document.getElementById('level-select');
         if (!container) return;
+        const highestSelectableLevel = this.getHighestSelectableLevel();
         container.innerHTML = '';
         LEVELS.forEach(lvl => {
             const btn = document.createElement('button');
             btn.innerText = lvl.id;
-            btn.className = 'lvl-btn' + (lvl.id > this.saveData.unlockedLevel ? ' locked' : '');
+            btn.className = 'lvl-btn' + (lvl.id > highestSelectableLevel ? ' locked' : '');
             const best = this.saveData.bests[lvl.id];
             if (best !== undefined) {
                 const bestSpan = document.createElement('span');
@@ -271,11 +390,14 @@ class SchattenJaeger {
                 bestSpan.innerText = lvl.targetType === 'score' ? best : best.toFixed(1) + 's';
                 btn.appendChild(bestSpan);
             }
-            btn.onclick = () => { if(lvl.id <= this.saveData.unlockedLevel) this.startLevel(lvl.id); };
+            btn.onclick = () => { if (lvl.id <= highestSelectableLevel) this.startLevel(lvl.id); };
             container.appendChild(btn);
         });
         const startBtn = document.getElementById('main-start-btn');
-        if (startBtn) startBtn.innerText = `LEVEL ${this.saveData.unlockedLevel} STARTEN`;
+        if (startBtn) {
+            const prefix = this.masterModeActive ? "MEISTER: " : "";
+            startBtn.innerText = `${prefix}LEVEL ${highestSelectableLevel} STARTEN`;
+        }
     }
 
     showMenu() {
@@ -293,8 +415,10 @@ class SchattenJaeger {
         this.timer = 0;
         this.enemies = [];
         this.particles = [];
-        this.player.x = 100;
-        this.player.y = 100;
+        this.player.x = this.canvas.width / 2;
+        this.player.y = this.canvas.height / 2 - 80;
+        this.spawnTimer = 60;
+        this.missionSplashTimer = 180; // 3 Sekunden für bessere Lesbarkeit
         this.pillar.radius = lvl.pillarRadius;
         this.pillar.baseRadius = lvl.pillarRadius;
         this.pillar.angle = 0;
@@ -348,16 +472,20 @@ class SchattenJaeger {
         return '#44ff44';
     }
 
-    findOrCreateComboGroup(newEnemyIndex) {
-        const newEnemy = this.enemies[newEnemyIndex];
+    getComboGroupSize(enemy) {
+        for (const group of this.comboGroups) {
+            if (group.includes(enemy)) return group.length;
+        }
+        return 1;
+    }
+
+    findOrCreateComboGroup(newEnemy) {
         let mergedGroups = [];
         let groupIndex = -1;
 
         for (let i = 0; i < this.comboGroups.length; i++) {
             const group = this.comboGroups[i];
-            for (const idx of group) {
-                const e = this.enemies[idx];
-                if (!e) continue;
+            for (const e of group) {
                 const dist = Math.sqrt((newEnemy.x - e.x) ** 2 + (newEnemy.y - e.y) ** 2);
                 if (dist < newEnemy.radius + e.radius) {
                     if (groupIndex === -1) groupIndex = i;
@@ -368,49 +496,46 @@ class SchattenJaeger {
         }
 
         if (mergedGroups.length > 0) {
-            let allIndices = [];
+            let allEnemies = [];
             for (const gi of mergedGroups) {
-                allIndices = allIndices.concat(this.comboGroups[gi]);
+                allEnemies = allEnemies.concat(this.comboGroups[gi]);
             }
-            allIndices.push(newEnemyIndex);
+            allEnemies.push(newEnemy);
             
-            for (let i = mergedGroups.length - 1; i >= 0; i--) {
-                this.comboGroups.splice(mergedGroups[i], 1);
+            // Entferne Gruppen von hinten nach vorne
+            const sortedMerged = mergedGroups.sort((a,b) => b-a);
+            for (const gi of sortedMerged) {
+                this.comboGroups.splice(gi, 1);
             }
-            this.comboGroups.push(allIndices);
+            this.comboGroups.push(allEnemies);
             
-            for (const idx of allIndices) {
-                if (this.enemies[idx]) {
-                    this.enemies[idx].comboSize = allIndices.length;
-                }
+            for (const e of allEnemies) {
+                e.comboSize = allEnemies.length;
             }
             return;
         }
 
-        this.comboGroups.push([newEnemyIndex]);
-        this.enemies[newEnemyIndex].comboSize = 1;
+        this.comboGroups.push([newEnemy]);
+        newEnemy.comboSize = 1;
     }
 
-    removeFromComboGroups(enemyIndex) {
+    removeFromComboGroups(enemy) {
         for (let i = this.comboGroups.length - 1; i >= 0; i--) {
             const group = this.comboGroups[i];
-            const pos = group.indexOf(enemyIndex);
+            const pos = group.indexOf(enemy);
             if (pos !== -1) {
                 group.splice(pos, 1);
-                for (const idx of group) {
-                    if (this.enemies[idx]) {
-                        this.enemies[idx].comboSize = group.length;
-                    }
+                for (const e of group) {
+                    e.comboSize = group.length;
                 }
                 if (group.length <= 1) {
+                    if (group.length === 1) group[0].comboSize = 1;
                     this.comboGroups.splice(i, 1);
-                    if (this.enemies[group[0]]) {
-                        this.enemies[group[0]].comboSize = 1;
-                    }
                 }
             }
         }
     }
+
 
     getShadowPoly() {
         if (!this.isLightOn) return null;
@@ -442,18 +567,35 @@ class SchattenJaeger {
 
     update() {
         if (this.state !== 'PLAYING') return;
+        if (this.spawnTimer > 0) this.spawnTimer--;
+        if (this.missionSplashTimer > 0) this.missionSplashTimer--;
+
         const lvl = LEVELS[this.currentLevelIdx];
         this.timer += 1/60;
         const currentEnemySpeed = lvl.enemySpeedStart + (lvl.enemySpeedMax - lvl.enemySpeedStart) * Math.min(1, this.timer * lvl.acceleration);
         const currentSpawnRate = lvl.spawnRateStart - (lvl.spawnRateStart - lvl.spawnRateMax) * Math.min(1, this.timer * lvl.acceleration);
-        if (lvl.pillarBehavior === 'moving') {
+        
+        // Pillar Behavior (Unterstützt jetzt mehrere Effekte)
+        const behavior = lvl.pillarBehavior || "";
+        if (behavior.includes('moving')) {
             this.pillar.angle += 0.02;
             this.pillar.x = this.canvas.width / 2 + Math.cos(this.pillar.angle) * 150;
             this.pillar.y = this.canvas.height / 2 + Math.sin(this.pillar.angle * 1.5) * 100;
-        } else if (lvl.pillarBehavior === 'shrinking') {
+        }
+        if (behavior.includes('shrinking')) {
             this.pillar.radius = Math.max(10, this.pillar.baseRadius - this.timer * 0.8);
         }
-        if (lvl.lightBehavior === 'flickering') { if (Math.random() < 0.02) this.isLightOn = !this.isLightOn; } else { this.isLightOn = true; }
+        if (behavior.includes('pulsating')) {
+            const pulse = Math.sin(this.timer * 3) * 15;
+            this.pillar.radius = Math.max(5, this.pillar.baseRadius + pulse);
+        }
+
+        // Light Behavior
+        if (lvl.lightBehavior === 'flickering') { 
+            if (Math.random() < 0.02) this.isLightOn = !this.isLightOn; 
+        } else { 
+            this.isLightOn = true; 
+        }
         
         // Movement Vektor initialisieren
         let dx = 0, dy = 0;
@@ -518,9 +660,10 @@ class SchattenJaeger {
             else if(side===1){ex=this.canvas.width+20; ey=Math.random()*this.canvas.height;}
             else if(side===2){ex=Math.random()*this.canvas.width; ey=this.canvas.height+20;}
             else {ex=-20; ey=Math.random()*this.canvas.height;}
-            const newEnemy = { x: ex, y: ey, radius: 12, speed: currentEnemySpeed };
+            const enemyRadius = lvl.enemyRadius || 12;
+            const newEnemy = { x: ex, y: ey, radius: enemyRadius, speed: currentEnemySpeed };
             this.enemies.push(newEnemy);
-            this.findOrCreateComboGroup(this.enemies.length - 1);
+            this.findOrCreateComboGroup(newEnemy);
         }
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const e = this.enemies[i];
@@ -538,13 +681,24 @@ class SchattenJaeger {
                 const withinKillRadius = lvl.shadowKillRadius === undefined || lvl.shadowKillRadius === null || distToPillar <= lvl.shadowKillRadius;
                 
                 if (withinKillRadius) {
-                    const comboSize = this.getComboGroupSize(i);
+                    const comboSize = this.getComboGroupSize(e);
                     const points = this.calcComboPoints(comboSize);
                     this.score += points;
-                    this.shake = 10;
+                    this.shake = 8 + comboSize * 4; // Stärkerer Shake bei Combos
                     this.playKillSound();
-                    for (let j = 0; j < 8; j++) this.particles.push({ x: e.x, y: e.y, vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.5) * 10, life: 1.0 });
-                    this.removeFromComboGroups(i);
+                    
+                    const pColor = this.getComboColor(comboSize);
+                    for (let j = 0; j < 12; j++) {
+                        this.particles.push({ 
+                            x: e.x, y: e.y, 
+                            vx: (Math.random() - 0.5) * 12, 
+                            vy: (Math.random() - 0.5) * 12, 
+                            life: 1.0,
+                            color: pColor,
+                            size: 2 + Math.random() * 3
+                        });
+                    }
+                    this.removeFromComboGroups(e);
                     this.enemies.splice(i, 1);
                     if (lvl.targetType === 'pacifist' && this.score > lvl.maxScore) {
                         this.lose("Pazifist-Ziel gescheitert!");
@@ -554,8 +708,11 @@ class SchattenJaeger {
             }
         }
         for (let i=this.particles.length-1; i>=0; i--) {
-            const p = this.particles[i]; p.x+=p.vx; p.y+=p.vy; p.life-=0.03;
-            if (p.life<=0) this.particles.splice(i, 1);
+            const p = this.particles[i]; 
+            p.x += p.vx; p.y += p.vy; 
+            p.vx *= 0.95; p.vy *= 0.95; // Reibung
+            p.life -= 0.025;
+            if (p.life <= 0) this.particles.splice(i, 1);
         }
         if (this.shake > 0) this.shake *= 0.9;
         if (this.state !== 'PLAYING') return;
@@ -563,6 +720,14 @@ class SchattenJaeger {
         if ((lvl.targetType === 'survival' || lvl.targetType === 'pacifist') && this.timer >= lvl.targetValue) this.win();
         const scoreHud = document.getElementById('hud-score');
         if (scoreHud) scoreHud.innerText = `Score: ${this.score}`;
+        
+        const timerHud = document.getElementById('hud-timer');
+        if (timerHud) {
+            const mins = Math.floor(this.timer / 60);
+            const secs = Math.floor(this.timer % 60);
+            const tenths = Math.floor((this.timer * 10) % 10);
+            timerHud.innerText = `Zeit: ${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${tenths}`;
+        }
     }
 
     lose(msg) { 
@@ -588,12 +753,16 @@ class SchattenJaeger {
         }
         const winBestMsg = document.getElementById('win-best-msg');
         if (winBestMsg) winBestMsg.innerText = isNewBest ? "NEUER REKORD!" : "";
-        if (lvl.id === this.saveData.unlockedLevel && this.saveData.unlockedLevel < LEVELS.length) { this.saveData.unlockedLevel++; }
+        if (lvl.id === this.saveData.unlockedLevel && this.saveData.unlockedLevel < this.getLastLevelId()) {
+            this.saveData.unlockedLevel++;
+        }
         localStorage.setItem('sj_v2_data', JSON.stringify(this.saveData));
         this.updateUI();
     }
 
     draw() {
+        const lvl = LEVELS[this.currentLevelIdx];
+
         this.ctx.save();
         if (this.shake > 0.5) this.ctx.translate((Math.random()-0.5)*this.shake, (Math.random()-0.5)*this.shake);
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -601,14 +770,23 @@ class SchattenJaeger {
         const poly = this.getShadowPoly();
         if (poly) { this.ctx.fillStyle = 'rgba(35, 35, 35, 0.8)'; this.ctx.beginPath(); this.ctx.moveTo(poly[0].x, poly[0].y); poly.forEach(pt => this.ctx.lineTo(pt.x, pt.y)); this.ctx.fill(); }
         this.ctx.fillStyle = '#111'; this.ctx.beginPath(); this.ctx.arc(this.pillar.x, this.pillar.y, this.pillar.radius, 0, Math.PI*2); this.ctx.fill(); this.ctx.strokeStyle = '#333'; this.ctx.stroke();
-        this.particles.forEach(p => { this.ctx.fillStyle = `rgba(255, 100, 100, ${p.life})`; this.ctx.fillRect(p.x, p.y, 2, 2); });
+        
+        this.particles.forEach(p => { 
+            this.ctx.fillStyle = p.color || `rgba(255, 100, 100, ${p.life})`; 
+            const s = (p.size || 2) * p.life;
+            this.ctx.fillRect(p.x - s/2, p.y - s/2, s, s); 
+        });
         this.enemies.forEach(e => { 
             const comboSize = e.comboSize || 1;
             const color = this.getComboColor(comboSize);
-            const glowIntensity = 15 + (comboSize - 1) * 5;
             this.ctx.fillStyle = color; 
-            this.ctx.shadowBlur = glowIntensity; 
-            this.ctx.shadowColor = color; 
+            
+            if (comboSize > 1) {
+                const glowIntensity = 10 + (comboSize - 1) * 5;
+                this.ctx.shadowBlur = glowIntensity; 
+                this.ctx.shadowColor = color; 
+            }
+
             this.ctx.beginPath(); 
             this.ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2); 
             this.ctx.fill(); 
@@ -627,6 +805,69 @@ class SchattenJaeger {
             }
         }
         this.ctx.fillStyle = '#fff'; this.ctx.shadowBlur = 20; this.ctx.shadowColor = '#fff'; this.ctx.beginPath(); this.ctx.arc(this.player.x, this.player.y, this.player.radius, 0, Math.PI*2); this.ctx.fill(); this.ctx.shadowBlur = 0;
+        
+        // Spawn-Effekt (Arc-Drop: Konzentrische Bögen springen ins Bild)
+        if (this.spawnTimer > 0) {
+            const t = 1 - (this.spawnTimer / 60);
+            // Elastic Easing für "Einschlag"-Gefühl
+            const ease = 1 - Math.pow(1 - t, 3); 
+            
+            this.ctx.save();
+            this.ctx.translate(this.player.x, this.player.y);
+            
+            for (let i = 0; i < 3; i++) {
+                const startRadius = 200 + i * 50;
+                const targetRadius = this.player.radius + i * 8;
+                const currentRadius = startRadius - (startRadius - targetRadius) * ease;
+                const opacity = Math.min(1, this.spawnTimer / 30);
+                
+                this.ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
+                this.ctx.lineWidth = 3 - i;
+                this.ctx.beginPath();
+                // Bögen rotieren leicht beim Fallen
+                const rotation = (1 - ease) * Math.PI;
+                this.ctx.arc(0, 0, currentRadius, rotation + i * Math.PI/2, rotation + i * Math.PI/2 + Math.PI/2);
+                this.ctx.stroke();
+            }
+            this.ctx.restore();
+        }
+
+        // Mission-Splash (Großer Auftragstext)
+        if (this.missionSplashTimer > 0) {
+            let opacity = 1;
+            if (this.missionSplashTimer < 60) opacity = this.missionSplashTimer / 60;
+
+            this.ctx.save();
+            this.ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+            this.ctx.textAlign = 'center';
+            this.ctx.font = 'bold 32px Segoe UI, sans-serif';
+            
+            let targetText = "";
+            if (lvl.targetType === 'score') targetText = `ZIEL: ${lvl.targetValue} PUNKTE`;
+            else if (lvl.targetType === 'survival') targetText = `ÜBERLEBE ${lvl.targetValue} SEKUNDEN`;
+            else if (lvl.targetType === 'pacifist') targetText = `PAZIFIST: ${lvl.targetValue}s (MAX ${lvl.maxScore} PKT)`;
+            
+            this.ctx.fillText(targetText, this.canvas.width / 2, this.canvas.height / 2 - 150);
+            this.ctx.font = '16px Segoe UI, sans-serif';
+            this.ctx.fillText(`${lvl.id}: ${lvl.name.toUpperCase()}`, this.canvas.width / 2, this.canvas.height / 2 - 190);
+            this.ctx.restore();
+        }
+
+        // Tutorial-Hinweise (nur in Level 0)
+        if (lvl.isTutorial && this.state === 'PLAYING') {
+            this.ctx.save();
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            this.ctx.textAlign = 'center';
+            this.ctx.font = '16px Segoe UI, sans-serif';
+            
+            let tip = "BEWEGE DICH MIT WASD ODER PFEILTASTEN";
+            if (this.score > 0) tip = "GUT GEMACHT! VERNICHTE WEITERE GEGNER";
+            else if (this.enemies.length > 0) tip = "LOCKE DEN GEGNER IN DEN SCHATTEN DER SÄULE";
+            
+            this.ctx.fillText(tip, this.canvas.width / 2, this.canvas.height - 150);
+            this.ctx.restore();
+        }
+
         this.ctx.restore();
     }
 

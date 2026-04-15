@@ -1,35 +1,41 @@
 # Schatten-Jäger
 
-Ein atmosphärisches Top-Down-Survival-Spiel für den Browser, bei dem Licht deine einzige Waffe und dein gefährlichster Feind zugleich ist.
+Ein Browser-Arcade-Spiel um Licht, Schatten und präzise Bewegung. Du steuerst eine Lichtquelle, nutzt den Schatten einer Säule als Waffe und überlebst gegen immer aggressivere Gegner.
 
-## Über das Spiel
-In **Schatten-Jäger** steuerst du eine Lichtquelle in einer dunklen Welt. In der Mitte des Spielfelds steht eine massive Säule, die einen dynamischen Schatten wirft. Deine Aufgabe ist es, Feinde zu eliminieren, indem du sie in den Schatten der Säule lockst. Doch Vorsicht: Wenn dich ein Feind im Licht berührt, ist das Spiel vorbei.
-
-## Features
-- **Einzigartige Mechanik:** Nutze Licht und Schatten strategisch zur Abwehr von Gegnern.
-- **31 Herausfordernde Level:** Verschiedene Missionstypen wie *Highscore*, *Überleben* und *Pazifist*.
-- **Dynamische Umgebungen:** Sich bewegende Säulen, schrumpfende Schatten und flackerndes Licht.
-- **Koop-Modus:** Spiele gemeinsam mit einem Freund – einer bewegt die Figur, der andere steuert den Lichtkegel.
-- **Progression:** Schalte neue Level frei und verbessere deine Bestzeiten. Alle Fortschritte werden lokal gespeichert.
-- **Audio & Effekte:** Prozedurale Klangerzeugung und visuelle Effekte für ein intensives Spielerlebnis.
+## Spielkonzept
+- **Kernidee:** Gegner sterben nur im Schatten der zentralen Säule.
+- **Modi:** `SOLO` mit gemeinsamer Bewegungssteuerung und `KOOP`, bei dem Bewegung und Lichtrotation getrennt sind.
+- **Inhalt:** 51 Level (`0` bis `50`) mit `score`, `survival` und `pacifist`-Zielen.
+- **Progression:** Freigeschaltete Level und Bestwerte werden in `localStorage` unter `sj_v2_data` gespeichert.
 
 ## Steuerung
 
 ### Desktop
-- **Solo-Modus**: **WASD** oder **Pfeiltasten** zur Bewegung.
-- **Koop-Modus**: 
-  - **Spieler 1 (Bewegung)**: WASD
-  - **Spieler 2 (Lichtkegel)**: Pfeiltasten
+- **Solo:** `WASD` oder Pfeiltasten bewegen die Figur.
+- **Koop:** `WASD` bewegt die Figur, Pfeiltasten drehen den Lichtkegel.
 
-### Mobil (Touch)
-Das Spiel erkennt automatisch, wenn du ein Touch-Gerät verwendest, und blendet feste virtuelle Joysticks ein:
-- **Solo-Modus**: Ein linker Joystick erscheint dauerhaft unten links und steuert die Bewegung.
-- **Koop-Modus**: 
-  - **Unten links**: Spieler 1 (Bewegung).
-  - **Unten rechts**: Spieler 2 (Lichtkegel-Rotation).
+### Touch
+- Touch-Steuerung wird erst nach der ersten echten Berührung aktiviert.
+- **Solo:** linker Joystick bewegt die Figur.
+- **Koop:** linker Joystick bewegt, rechter Joystick dreht den Lichtkegel.
 
-## Installation & Start
-Keine Installation erforderlich! Öffne einfach die `index.html` in einem modernen Webbrowser deiner Wahl.
+## Meister-Modus
+- `angimylove` im Menü aktiviert den Meister-Modus für die aktuelle Sitzung.
+- `exit` im Menü beendet den Meister-Modus wieder.
+- Der Meister-Modus speichert keine dauerhafte Komplett-Freischaltung.
 
----
-Entwickelt als "Professional Web Edition" mit Fokus auf Performance und minimalistisches Design.
+## Projektstruktur
+- `index.html`: UI-Struktur, Overlays und Canvas.
+- `game.js`: Hauptlogik, State-Machine, Input, Rendering, Audio.
+- `levels.js`: Leveldaten und Missionsparameter.
+- `styles.css`: Layout, HUD, Menü und Touch-UI.
+- `docs/`: Architektur, Changelog, Roadmap und Arbeitskontext.
+
+## Start
+Es gibt keinen Build-Schritt. Für lokale Tests reicht:
+
+```bash
+python3 -m http.server 8000
+```
+
+Dann `http://localhost:8000` im Browser öffnen. Alternativ kann `index.html` direkt geöffnet werden.
