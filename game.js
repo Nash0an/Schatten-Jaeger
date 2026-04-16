@@ -103,11 +103,40 @@ class SchattenJaeger {
     }
 
     getHighestSelectableLevel() {
-        return this.masterModeActive ? this.getLastLevelId() : Math.min(this.saveData.unlockedLevel, this.getLastLevelId());
+        return this.getLastLevelId();
+    }
+
+    getSuggestedStartLevel() {
+        const highestCompleted = this.getHighestCompletedLevel();
+        if (highestCompleted < this.getFirstLevelId()) return this.getFirstLevelId();
+        return Math.min(highestCompleted + 1, this.getLastLevelId());
     }
 
     getBasePlayerSpeedPerSecond() {
         return this.player.speed * 60;
+    }
+
+    isRingGameMode() {
+        return this.gameMode === 'RING_SOLO' || this.gameMode === 'RING_DUO' || this.gameMode === 'RING_TRIO';
+    }
+
+    getRingPlayerCountForMode() {
+        if (this.gameMode === 'RING_SOLO') return 1;
+        if (this.gameMode === 'RING_TRIO') return 3;
+        if (this.gameMode === 'RING_DUO') return 2;
+        return 0;
+    }
+
+    getRingSpawnLayout(count, scale = 1) {
+        const layouts = {
+            1: [{ x: 0, y: 0 }],
+            2: [{ x: -26, y: 0 }, { x: 26, y: 0 }],
+            3: [{ x: -22, y: 16 }, { x: 22, y: 16 }, { x: 0, y: -24 }]
+        };
+        return (layouts[count] || layouts[2]).map((offset) => ({
+            x: offset.x * scale,
+            y: offset.y * scale
+        }));
     }
 
     setupRingForcePrototype() {
@@ -116,10 +145,10 @@ class SchattenJaeger {
             name: 'Innenring-Prototyp',
             description: 'Spieler bewegen sich im Tempo des Hauptspiels und schieben den Ring nur ueber Innenwand-Kontakt.',
             radius: 170,
-            thickness: 34,
+            thickness: 26,
             pushSpeedScale: baseSpeed * 0.75,
             maxRingSpeed: baseSpeed * 1.4,
-            innerPadding: 10,
+            innerPadding: 1,
             contactThreshold: 0.5,
             carryDragBase: baseSpeed * 0.32,
             carryDragOppose: baseSpeed * 0.26,
@@ -129,6 +158,7 @@ class SchattenJaeger {
             netSpeed: 0,
             carryDrag: 0,
             activePushers: 0,
+            activePlayerCount: 2,
             players: [
                 {
                     id: 1,
@@ -159,10 +189,35 @@ class SchattenJaeger {
                     pushStrength: 0,
                     carryResistance: 0,
                     controlsLabel: 'P2 Pfeile'
+                },
+                {
+                    id: 3,
+                    color: '#7dff8a',
+                    radius: 13,
+                    speed: baseSpeed,
+                    worldPos: { x: 0, y: 0 },
+                    spawnOffset: { x: 0, y: 55 },
+                    input: { x: 0, y: 0 },
+                    pushing: false,
+                    carried: false,
+                    pushVector: { x: 0, y: 0 },
+                    pushStrength: 0,
+                    carryResistance: 0,
+                    controlsLabel: 'P3 HBNM'
                 }
             ]
         };
 
+        this.resetRingForceBody();
+    }
+
+    getActiveRingPlayers() {
+        return this.ringForcePrototype.players.slice(0, this.ringForcePrototype.activePlayerCount);
+    }
+
+    setRingForcePlayerCount(count) {
+        if (!this.ringForcePrototype) return;
+        this.ringForcePrototype.activePlayerCount = Math.max(1, Math.min(3, count));
         this.resetRingForceBody();
     }
 
@@ -178,9 +233,18 @@ class SchattenJaeger {
         this.ringForcePrototype.netSpeed = 0;
         this.ringForcePrototype.carryDrag = 0;
         this.ringForcePrototype.activePushers = 0;
-        this.ringForcePrototype.players.forEach((player) => {
-            player.worldPos.x = this.ringForcePrototype.position.x + player.spawnOffset.x;
-            player.worldPos.y = this.ringForcePrototype.position.y + player.spawnOffset.y;
+        const activeOffsets = [
+            [{ x: 0, y: 0 }],
+            [{ x: -55, y: 0 }, { x: 55, y: 0 }],
+            [{ x: -45, y: 18 }, { x: 45, y: 18 }, { x: 0, y: -48 }]
+        ];
+        this.ringForcePrototype.players.forEach((player, idx) => {
+            const offsets = activeOffsets[this.ringForcePrototype.activePlayerCount - 1];
+            const offset = offsets[Math.min(idx, offsets.length - 1)];
+            player.spawnOffset.x = offset.x;
+            player.spawnOffset.y = offset.y;
+            player.worldPos.x = this.ringForcePrototype.position.x + offset.x;
+            player.worldPos.y = this.ringForcePrototype.position.y + offset.y;
             player.input.x = 0;
             player.input.y = 0;
             player.pushing = false;
@@ -200,7 +264,7 @@ class SchattenJaeger {
     }
 
     getRingForceInnerLimit(player) {
-        return this.ringForcePrototype.radius - this.ringForcePrototype.thickness - this.ringForcePrototype.innerPadding - player.radius;
+        return this.ringForcePrototype.radius - (this.ringForcePrototype.thickness / 2) - this.ringForcePrototype.innerPadding - player.radius;
     }
 
     getRingForcePlayerWorldPos(player) {
@@ -233,6 +297,13 @@ class SchattenJaeger {
     handleRingForceHotkeys(e) {
         if (!this.ringForcePrototype) return false;
 
+        if (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3') {
+            e.preventDefault();
+            this.setRingForcePlayerCount(Number(e.code.slice(-1)));
+            this.updateRingForceHud();
+            return true;
+        }
+
         if (e.code === 'Escape') {
             e.preventDefault();
             this.showMenu();
@@ -257,13 +328,15 @@ class SchattenJaeger {
         const hudTarget = document.getElementById('hud-target');
         const hudTimer = document.getElementById('hud-timer');
         const hudScore = document.getElementById('hud-score');
-        const p1 = ring.players[0];
-        const p2 = ring.players[1];
+        const activePlayers = this.getActiveRingPlayers();
+        const playerSummary = activePlayers
+            .map((player) => `P${player.id} Schub ${player.pushStrength.toFixed(0)} Drag ${player.carryResistance.toFixed(0)}`)
+            .join(' | ');
 
         if (hudLvl) hudLvl.innerText = 'Ring-Force Innenraum';
-        if (hudTarget) hudTarget.innerText = 'Nur Innenwand-Kontakt uebertraegt Schub auf den Ring.';
+        if (hudTarget) hudTarget.innerText = `Nur Innenwand-Kontakt uebertraegt Schub auf den Ring. Aktive Spieler: ${ring.activePlayerCount}`;
         if (hudTimer) hudTimer.innerText = `Ring v=(${ring.velocity.x.toFixed(1)}, ${ring.velocity.y.toFixed(1)}) | Speed ${ring.netSpeed.toFixed(0)} | Schieber: ${ring.activePushers}`;
-        if (hudScore) hudScore.innerText = `P1 Schub ${p1.pushStrength.toFixed(0)} Drag ${p1.carryResistance.toFixed(0)} | P2 Schub ${p2.pushStrength.toFixed(0)} Drag ${p2.carryResistance.toFixed(0)}`;
+        if (hudScore) hudScore.innerText = playerSummary;
     }
 
     initTouch() {
@@ -331,6 +404,9 @@ class SchattenJaeger {
         this.gameMode = mode;
         document.getElementById('mode-solo').classList.toggle('selected', mode === 'SOLO');
         document.getElementById('mode-coop').classList.toggle('selected', mode === 'COOP');
+        document.getElementById('mode-ring-solo').classList.toggle('selected', mode === 'RING_SOLO');
+        document.getElementById('mode-ring-duo').classList.toggle('selected', mode === 'RING_DUO');
+        document.getElementById('mode-ring-trio').classList.toggle('selected', mode === 'RING_TRIO');
     }
 
     bindEvents() {
@@ -360,8 +436,14 @@ class SchattenJaeger {
 
         const soloCard = document.getElementById('mode-solo');
         const coopCard = document.getElementById('mode-coop');
+        const ringSoloCard = document.getElementById('mode-ring-solo');
+        const ringDuoCard = document.getElementById('mode-ring-duo');
+        const ringTrioCard = document.getElementById('mode-ring-trio');
         if (soloCard) soloCard.addEventListener('pointerup', () => this.setMode('SOLO'));
         if (coopCard) coopCard.addEventListener('pointerup', () => this.setMode('COOP'));
+        if (ringSoloCard) ringSoloCard.addEventListener('pointerup', () => this.setMode('RING_SOLO'));
+        if (ringDuoCard) ringDuoCard.addEventListener('pointerup', () => this.setMode('RING_DUO'));
+        if (ringTrioCard) ringTrioCard.addEventListener('pointerup', () => this.setMode('RING_TRIO'));
 
         // Globaler Touch-Listener zur Aktivierung der Touch-Steuerung
         window.addEventListener('touchstart', () => this.initTouch(), { once: true });
@@ -568,12 +650,13 @@ class SchattenJaeger {
     updateLevelSelect() {
         const container = document.getElementById('level-select');
         if (!container) return;
-        const highestSelectableLevel = this.getHighestSelectableLevel();
+        const suggestedStartLevel = this.getSuggestedStartLevel();
         container.innerHTML = '';
         LEVELS.forEach(lvl => {
             const btn = document.createElement('button');
             btn.innerText = lvl.id;
-            btn.className = 'lvl-btn' + (lvl.id > highestSelectableLevel ? ' locked' : '');
+            const completed = this.saveData.bests[lvl.id] !== undefined;
+            btn.className = `lvl-btn ${completed ? 'completed' : 'incomplete'}${lvl.id === suggestedStartLevel ? ' current-target' : ''}`;
             const best = this.saveData.bests[lvl.id];
             if (best !== undefined) {
                 const bestSpan = document.createElement('span');
@@ -581,13 +664,12 @@ class SchattenJaeger {
                 bestSpan.innerText = lvl.targetType === 'score' ? best : best.toFixed(1) + 's';
                 btn.appendChild(bestSpan);
             }
-            btn.onclick = () => { if (lvl.id <= highestSelectableLevel) this.startLevel(lvl.id); };
+            btn.onclick = () => this.startLevel(lvl.id);
             container.appendChild(btn);
         });
         const startBtn = document.getElementById('main-start-btn');
         if (startBtn) {
-            const prefix = this.masterModeActive ? "MEISTER: " : "";
-            startBtn.innerText = `${prefix}LEVEL ${highestSelectableLevel} STARTEN`;
+            startBtn.innerText = `LEVEL ${suggestedStartLevel} STARTEN`;
         }
     }
 
@@ -626,6 +708,22 @@ class SchattenJaeger {
         this.pillar.angle = 0;
         this.isLightOn = true;
         this.updatePillarPos();
+        if (this.isRingGameMode()) {
+            this.ringForcePrototype.activePlayerCount = this.getRingPlayerCountForMode();
+            this.ringForcePrototype.radius = 88;
+            this.ringForcePrototype.thickness = 14;
+            this.ringForcePrototype.innerPadding = 1;
+            this.resetRingForceBody();
+            this.ringForcePrototype.position.x = this.player.x;
+            this.ringForcePrototype.position.y = this.player.y;
+            const spawnLayout = this.getRingSpawnLayout(this.ringForcePrototype.activePlayerCount, 1);
+            this.getActiveRingPlayers().forEach((player, idx) => {
+                player.worldPos.x = this.ringForcePrototype.position.x + spawnLayout[idx].x;
+                player.worldPos.y = this.ringForcePrototype.position.y + spawnLayout[idx].y;
+            });
+            this.player.x = this.ringForcePrototype.position.x;
+            this.player.y = this.ringForcePrototype.position.y;
+        }
         this.state = 'PLAYING';
         this.updateUI();
         this.configureTouchControls();
@@ -636,6 +734,16 @@ class SchattenJaeger {
         const nextId = LEVELS[this.currentLevelIdx].id + 1;
         if (nextId <= LEVELS.length) this.startLevel(nextId);
         else this.showMenu();
+    }
+    canSkipLevel() {
+        return LEVELS[this.currentLevelIdx] && LEVELS[this.currentLevelIdx].id < this.getLastLevelId();
+    }
+    skipLevel() {
+        if (!this.canSkipLevel()) {
+            this.showMenu();
+            return;
+        }
+        this.startLevel(LEVELS[this.currentLevelIdx].id + 1);
     }
 
     updateUI() {
@@ -662,6 +770,12 @@ class SchattenJaeger {
             if (hudTarget) hudTarget.innerText = `Ziel: ${targetText}`;
         } else if (this.state === 'RING_FORCE') {
             this.updateRingForceHud();
+        }
+
+        const skipBtn = document.getElementById('skip-level-btn');
+        if (skipBtn) {
+            skipBtn.disabled = !this.canSkipLevel();
+            skipBtn.style.display = this.state === 'LOSE' ? 'inline-block' : 'none';
         }
     }
 
@@ -769,19 +883,35 @@ class SchattenJaeger {
         return inside;
     }
 
+    hitsActivePlayer(enemy) {
+        const centerDist = Math.sqrt((this.player.x - enemy.x) ** 2 + (this.player.y - enemy.y) ** 2);
+        if (centerDist < this.player.radius + enemy.radius) {
+            return true;
+        }
+
+        if (!this.isRingGameMode()) return false;
+
+        return this.getActiveRingPlayers().some((ringPlayer) => {
+            const pos = this.getRingForcePlayerWorldPos(ringPlayer);
+            const dist = Math.sqrt((pos.x - enemy.x) ** 2 + (pos.y - enemy.y) ** 2);
+            return dist < ringPlayer.radius + enemy.radius;
+        });
+    }
+
     updateRingForce(dt) {
         const ring = this.ringForcePrototype;
         if (!ring) return;
 
         const controlMaps = [
             { left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS' },
-            { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' }
+            { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' },
+            { left: 'KeyH', right: 'KeyN', up: 'KeyB', down: 'KeyM' }
         ];
         let totalPushX = 0;
         let totalPushY = 0;
         let activePushers = 0;
 
-        ring.players.forEach((player, idx) => {
+        this.getActiveRingPlayers().forEach((player, idx) => {
             const controls = controlMaps[idx];
             let inputX = 0;
             let inputY = 0;
@@ -848,7 +978,7 @@ class SchattenJaeger {
             const dirX = desiredVelX / desiredMagnitude;
             const dirY = desiredVelY / desiredMagnitude;
 
-            ring.players.forEach((player) => {
+            this.getActiveRingPlayers().forEach((player) => {
                 if (player.pushing) return;
 
                 const relativePos = this.getRingForcePlayerRelativePos(player);
@@ -886,7 +1016,7 @@ class SchattenJaeger {
         ring.position.x += ring.velocity.x * dt;
         ring.position.y += ring.velocity.y * dt;
 
-        ring.players.forEach((player) => {
+        this.getActiveRingPlayers().forEach((player) => {
             this.constrainRingForcePlayerInside(player);
         });
 
@@ -912,6 +1042,15 @@ class SchattenJaeger {
         }
 
         this.updateRingForceHud();
+    }
+
+    updateRingLevelMovement(dt) {
+        const ring = this.ringForcePrototype;
+        if (!ring) return;
+
+        this.updateRingForce(dt);
+        this.player.x = ring.position.x;
+        this.player.y = ring.position.y;
     }
 
     update(dt = 1 / 60) {
@@ -954,7 +1093,9 @@ class SchattenJaeger {
         // Movement Vektor initialisieren
         let dx = 0, dy = 0;
 
-        if (this.gameMode === 'SOLO') {
+        if (this.isRingGameMode()) {
+            this.updateRingLevelMovement(dt);
+        } else if (this.gameMode === 'SOLO') {
             // Solo: WASD + Pfeile steuern die Bewegung
             if (this.keys['ArrowUp'] || this.keys['KeyW']) dy -= 1;
             if (this.keys['ArrowDown'] || this.keys['KeyS']) dy += 1;
@@ -998,13 +1139,33 @@ class SchattenJaeger {
                 this.lightAngle += this.joystickData.right.vectorX * this.rotationSpeed * 1.5;
             }
         }
-        this.player.x = Math.max(this.player.radius, Math.min(this.canvas.width - this.player.radius, this.player.x));
-        this.player.y = Math.max(this.player.radius, Math.min(this.canvas.height - this.player.radius, this.player.y));
-        const pdx=this.player.x-this.pillar.x, pdy=this.player.y-this.pillar.y, pdist=Math.sqrt(pdx*pdx+pdy*pdy);
-        if (pdist < this.player.radius+this.pillar.radius){
-            const ang=Math.atan2(pdy,pdx);
-            this.player.x=this.pillar.x+Math.cos(ang)*(this.player.radius+this.pillar.radius);
-            this.player.y=this.pillar.y+Math.sin(ang)*(this.player.radius+this.pillar.radius);
+        if (!this.isRingGameMode()) {
+            this.player.x = Math.max(this.player.radius, Math.min(this.canvas.width - this.player.radius, this.player.x));
+            this.player.y = Math.max(this.player.radius, Math.min(this.canvas.height - this.player.radius, this.player.y));
+            const pdx=this.player.x-this.pillar.x, pdy=this.player.y-this.pillar.y, pdist=Math.sqrt(pdx*pdx+pdy*pdy);
+            if (pdist < this.player.radius+this.pillar.radius){
+                const ang=Math.atan2(pdy,pdx);
+                this.player.x=this.pillar.x+Math.cos(ang)*(this.player.radius+this.pillar.radius);
+                this.player.y=this.pillar.y+Math.sin(ang)*(this.player.radius+this.pillar.radius);
+            }
+        } else {
+            const ringPadding = this.ringForcePrototype.radius + 10;
+            this.ringForcePrototype.position.x = Math.max(ringPadding, Math.min(this.canvas.width - ringPadding, this.ringForcePrototype.position.x));
+            this.ringForcePrototype.position.y = Math.max(ringPadding, Math.min(this.canvas.height - ringPadding, this.ringForcePrototype.position.y));
+            const rdx = this.ringForcePrototype.position.x - this.pillar.x;
+            const rdy = this.ringForcePrototype.position.y - this.pillar.y;
+            const ringDist = Math.sqrt(rdx * rdx + rdy * rdy);
+            const minDist = this.ringForcePrototype.radius + this.pillar.radius;
+            if (ringDist < minDist) {
+                const ang = Math.atan2(rdy, rdx);
+                this.ringForcePrototype.position.x = this.pillar.x + Math.cos(ang) * minDist;
+                this.ringForcePrototype.position.y = this.pillar.y + Math.sin(ang) * minDist;
+                this.getActiveRingPlayers().forEach((player) => {
+                    this.constrainRingForcePlayerInside(player);
+                });
+            }
+            this.player.x = this.ringForcePrototype.position.x;
+            this.player.y = this.ringForcePrototype.position.y;
         }
         const shadow = this.getShadowPoly();
         if (Math.random() < 1/currentSpawnRate) {
@@ -1022,13 +1183,17 @@ class SchattenJaeger {
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const e = this.enemies[i];
             const edx = this.player.x - e.x, edy = this.player.y - e.y, edist = Math.sqrt(edx*edx + edy*edy);
-            if (edist < this.player.radius + e.radius) {
+            if (this.hitsActivePlayer(e)) {
                 this.lose("Die Dunkelheit hat dich eingeholt.");
                 return;
             }
             if (edist > 0) {
                 e.x += (edx/edist) * e.speed;
                 e.y += (edy/edist) * e.speed;
+            }
+            if (this.hitsActivePlayer(e)) {
+                this.lose("Die Dunkelheit hat dich eingeholt.");
+                return;
             }
             if (shadow && this.isPointInPoly(e, shadow)) {
                 const distToPillar = Math.sqrt((e.x - this.pillar.x) ** 2 + (e.y - this.pillar.y) ** 2);
@@ -1107,11 +1272,9 @@ class SchattenJaeger {
         }
         const winBestMsg = document.getElementById('win-best-msg');
         if (winBestMsg) winBestMsg.innerText = isNewBest ? "NEUER REKORD!" : "";
-        if (lvl.id === this.saveData.unlockedLevel && this.saveData.unlockedLevel < this.getLastLevelId()) {
-            this.saveData.unlockedLevel++;
-        }
         localStorage.setItem('sj_v2_data', JSON.stringify(this.saveData));
         this.updateUI();
+        this.updateLevelSelect();
     }
 
     drawForceArrow(x, y, vx, vy, color, scale = 1) {
@@ -1144,6 +1307,10 @@ class SchattenJaeger {
     drawRingForce() {
         const ring = this.ringForcePrototype;
         if (!ring) return;
+        const activePlayers = this.getActiveRingPlayers();
+        const playerSummary = activePlayers
+            .map((player) => `P${player.id} Schub ${player.pushStrength.toFixed(0)} Drag ${player.carryResistance.toFixed(0)}`)
+            .join(' | ');
 
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.ctx.fillStyle = '#050505';
@@ -1180,12 +1347,12 @@ class SchattenJaeger {
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
         this.ctx.lineWidth = 1;
         this.ctx.beginPath();
-        this.ctx.arc(0, 0, this.getRingForceInnerLimit(ring.players[0]) + ring.players[0].radius, 0, Math.PI * 2);
+        this.ctx.arc(0, 0, this.getRingForceInnerLimit(activePlayers[0]) + activePlayers[0].radius, 0, Math.PI * 2);
         this.ctx.stroke();
         this.ctx.setLineDash([]);
         this.ctx.restore();
 
-        ring.players.forEach((player) => {
+        activePlayers.forEach((player) => {
             const pos = this.getRingForcePlayerWorldPos(player);
             this.ctx.fillStyle = player.color;
             this.ctx.beginPath();
@@ -1225,10 +1392,37 @@ class SchattenJaeger {
         this.ctx.font = '15px Segoe UI, sans-serif';
         this.ctx.fillStyle = '#ccc';
         this.ctx.fillText(ring.description, 24, this.canvas.height - 120);
-        this.ctx.fillText('P1: WASD | P2: Pfeile | Nur Druck gegen die Innenwand bewegt den Ring | R Reset | Esc Menue', 24, this.canvas.height - 92);
-        this.ctx.fillText(`P1 Schub ${ring.players[0].pushStrength.toFixed(0)} Drag ${ring.players[0].carryResistance.toFixed(0)} | P2 Schub ${ring.players[1].pushStrength.toFixed(0)} Drag ${ring.players[1].carryResistance.toFixed(0)}`, 24, this.canvas.height - 64);
+        this.ctx.fillText('P1: WASD | P2: Pfeile | P3: HBNM | Sandbox: 1/2/3 Spieler | R Reset | Esc Menue', 24, this.canvas.height - 92);
+        this.ctx.fillText(playerSummary, 24, this.canvas.height - 64);
         this.ctx.fillText(`Netto-Speed ${ring.netSpeed.toFixed(0)} | Gesamt-Drag ${ring.carryDrag.toFixed(0)} | Ringposition: (${ring.position.x.toFixed(1)}, ${ring.position.y.toFixed(1)})`, 24, this.canvas.height - 36);
         this.ctx.fillText('Mitgeschleppte Spieler bremsen. Wer aktiv in Ringrichtung mitlaeuft, reduziert diesen Widerstand.', 24, this.canvas.height - 8);
+    }
+
+    drawRingForceInLevel() {
+        const ring = this.ringForcePrototype;
+        if (!ring || !this.isRingGameMode() || this.state !== 'PLAYING') return;
+
+        this.ctx.save();
+        this.ctx.translate(ring.position.x, ring.position.y);
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, ring.radius - ring.thickness, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        this.ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+        this.ctx.lineWidth = ring.thickness;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, ring.radius, 0, Math.PI * 2);
+        this.ctx.stroke();
+        this.ctx.restore();
+
+        this.getActiveRingPlayers().forEach((player) => {
+            const pos = this.getRingForcePlayerWorldPos(player);
+            this.ctx.fillStyle = player.color;
+            this.ctx.beginPath();
+            this.ctx.arc(pos.x, pos.y, player.radius, 0, Math.PI * 2);
+            this.ctx.fill();
+        });
     }
 
     draw() {
@@ -1269,7 +1463,7 @@ class SchattenJaeger {
             this.ctx.shadowBlur = 0; 
         });
         if (this.isLightOn) {
-            if (this.gameMode === 'SOLO') {
+            if (this.gameMode === 'SOLO' || this.isRingGameMode()) {
                 const grad = this.ctx.createRadialGradient(this.player.x, this.player.y, 0, this.player.x, this.player.y, 350);
                 grad.addColorStop(0, 'rgba(255,255,255,0.15)'); grad.addColorStop(1, 'transparent');
                 this.ctx.fillStyle = grad; this.ctx.fillRect(0,0,this.canvas.width, this.canvas.height);
@@ -1281,6 +1475,7 @@ class SchattenJaeger {
             }
         }
         this.ctx.fillStyle = '#fff'; this.ctx.shadowBlur = 20; this.ctx.shadowColor = '#fff'; this.ctx.beginPath(); this.ctx.arc(this.player.x, this.player.y, this.player.radius, 0, Math.PI*2); this.ctx.fill(); this.ctx.shadowBlur = 0;
+        this.drawRingForceInLevel();
         
         // Spawn-Effekt (Arc-Drop: Konzentrische Bögen springen ins Bild)
         if (this.spawnTimer > 0) {

@@ -99,6 +99,7 @@ button:active { transform: scale(0.95); }
 
 .mode-selection {
     display: flex;
+    flex-wrap: wrap;
     gap: 15px;
     margin: 20px 0;
 }
@@ -111,6 +112,7 @@ button:active { transform: scale(0.95); }
     padding: 12px;
     border-radius: 10px;
     flex: 1;
+    min-width: 150px;
     cursor: pointer;
     transition: all 0.2s;
     margin: 0;
@@ -132,7 +134,9 @@ button:active { transform: scale(0.95); }
 }
 
 .lvl-btn { width: 100%; aspect-ratio: 1/1; padding: 0; font-size: 14px; margin: 0; position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-.lvl-btn.locked { opacity: 0.3; cursor: not-allowed; }
+.lvl-btn.incomplete { opacity: 0.35; background: #1a1a1a; color: #bbb; border: 1px solid #333; }
+.lvl-btn.completed { opacity: 1; border: 1px solid #44ff44; box-shadow: 0 0 10px rgba(68, 255, 68, 0.18); }
+.lvl-btn.current-target { border-color: #fff; }
 .lvl-btn .best { position: absolute; bottom: 2px; width: 100%; font-size: 9px; color: #44ff44; font-weight: normal; }
 .btn-reset-progress {
     display: inline-block;
