@@ -1,5 +1,4 @@
 const LEVELS = [
-    { id: 0, name: "Tutorial", targetType: 'score', targetValue: 10, pillarRadius: 40, pillarBehavior: 'static', shadowKillRadius: null, enemySpeedStart: 0.8, enemySpeedMax: 0.8, spawnRateStart: 300, spawnRateMax: 300, acceleration: 0, lightBehavior: 'stable', isTutorial: true },
     { id: 1, name: "Einstieg", targetType: 'score', targetValue: 50, pillarRadius: 40, pillarBehavior: 'static', shadowKillRadius: null, enemySpeedStart: 1.2, enemySpeedMax: 1.2, spawnRateStart: 120, spawnRateMax: 120, acceleration: 0, lightBehavior: 'stable' },
     { id: 2, name: "Beschleunigung", targetType: 'survival', targetValue: 20, pillarRadius: 35, pillarBehavior: 'static', shadowKillRadius: null, enemySpeedStart: 1.0, enemySpeedMax: 2.5, spawnRateStart: 120, spawnRateMax: 60, acceleration: 0.05, lightBehavior: 'stable' },
     { id: 3, name: "Der Pazifist", targetType: 'pacifist', targetValue: 20, maxScore: 20, pillarRadius: 40, pillarBehavior: 'static', shadowKillRadius: null, enemySpeedStart: 1.5, enemySpeedMax: 1.5, spawnRateStart: 80, spawnRateMax: 80, acceleration: 0, lightBehavior: 'stable' },

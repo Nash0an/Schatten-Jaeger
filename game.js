@@ -5,7 +5,7 @@ class SchattenJaeger {
         this.audioCtx = null;
 
         const saved = localStorage.getItem('sj_v2_data');
-        this.saveData = saved ? JSON.parse(saved) : { unlockedLevel: 0, bests: {} };
+        this.saveData = saved ? JSON.parse(saved) : this.createFreshSaveData();
         this.masterModeActive = false;
         this.restoreProgressFromBests();
 
@@ -56,6 +56,14 @@ class SchattenJaeger {
         return LEVELS[LEVELS.length - 1].id;
     }
 
+    getFirstLevelId() {
+        return LEVELS[0].id;
+    }
+
+    createFreshSaveData() {
+        return { unlockedLevel: this.getFirstLevelId(), bests: {} };
+    }
+
     getHighestCompletedLevel() {
         const completedIds = Object.keys(this.saveData.bests)
             .map((id) => Number(id))
@@ -65,15 +73,29 @@ class SchattenJaeger {
     }
 
     restoreProgressFromBests() {
+        const firstLevelId = this.getFirstLevelId();
         const highestCompleted = this.getHighestCompletedLevel();
-        const recoveredUnlockedLevel = Math.min(highestCompleted + 1, this.getLastLevelId());
+        const recoveredUnlockedLevel = highestCompleted < firstLevelId
+            ? firstLevelId
+            : Math.min(highestCompleted + 1, this.getLastLevelId());
+        let needsSave = false;
 
         if (typeof this.saveData.unlockedLevel !== 'number' || Number.isNaN(this.saveData.unlockedLevel)) {
-            this.saveData.unlockedLevel = 0;
+            this.saveData.unlockedLevel = firstLevelId;
+            needsSave = true;
+        }
+
+        if (this.saveData.unlockedLevel < firstLevelId) {
+            this.saveData.unlockedLevel = firstLevelId;
+            needsSave = true;
         }
 
         if (this.saveData.unlockedLevel > recoveredUnlockedLevel) {
             this.saveData.unlockedLevel = recoveredUnlockedLevel;
+            needsSave = true;
+        }
+
+        if (needsSave) {
             localStorage.setItem('sj_v2_data', JSON.stringify(this.saveData));
         }
     }
@@ -405,6 +427,17 @@ class SchattenJaeger {
         this.updateUI();
         this.updateLevelSelect();
         this.configureTouchControls();
+    }
+
+    resetProgress() {
+        const confirmed = window.confirm('Gesamten Fortschritt und alle Rekorde wirklich zurücksetzen?');
+        if (!confirmed) return;
+
+        localStorage.removeItem('sj_v2_data');
+        this.saveData = this.createFreshSaveData();
+        this.masterModeActive = false;
+        this.currentLevelIdx = 0;
+        this.showMenu();
     }
 
     startLevel(id) {
@@ -852,22 +885,6 @@ class SchattenJaeger {
             this.ctx.fillText(`${lvl.id}: ${lvl.name.toUpperCase()}`, this.canvas.width / 2, this.canvas.height / 2 - 190);
             this.ctx.restore();
         }
-
-        // Tutorial-Hinweise (nur in Level 0)
-        if (lvl.isTutorial && this.state === 'PLAYING') {
-            this.ctx.save();
-            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-            this.ctx.textAlign = 'center';
-            this.ctx.font = '16px Segoe UI, sans-serif';
-            
-            let tip = "BEWEGE DICH MIT WASD ODER PFEILTASTEN";
-            if (this.score > 0) tip = "GUT GEMACHT! VERNICHTE WEITERE GEGNER";
-            else if (this.enemies.length > 0) tip = "LOCKE DEN GEGNER IN DEN SCHATTEN DER SÄULE";
-            
-            this.ctx.fillText(tip, this.canvas.width / 2, this.canvas.height - 150);
-            this.ctx.restore();
-        }
-
         this.ctx.restore();
     }
 

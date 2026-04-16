@@ -2,6 +2,14 @@
 
 Alle relevanten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [2.5.2] - 2026-04-15
+### Geändert
+- Tutorial-Level 0 wurde wieder entfernt; die Progression startet nun direkt bei Level 1.
+- Menü enthält jetzt einen bewusst unauffälligen Button zum Zurücksetzen des lokalen Fortschritts.
+
+### Behoben
+- Alte Speicherstände mit freigeschaltetem Level 0 werden beim Laden sauber auf das neue Startlevel migriert.
+
 ## [2.5.1] - 2026-04-15
 ### Behoben
 - Solo-/Koop-Auswahl im Menü reagiert wieder zuverlässig auf Touch und Pointer.
