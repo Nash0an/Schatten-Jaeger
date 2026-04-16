@@ -2,6 +2,15 @@
 
 Alle relevanten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [2.5.3] - 2026-04-17
+### Hinzugefügt
+- Separater `Ring-Force`-Physikprototyp im Menü, in dem zwei Spieler sich frei im Ringinneren bewegen.
+- Der Ring verschiebt sich nur durch aktiven Druck gegen seine Innenwand; ohne Druck bleibt er sofort stehen.
+
+### Geändert
+- Stillstehende Spieler bleiben bei Ringbewegung zunächst in Weltkoordinaten stehen und werden erst von der nachrückenden Innenwand mitgenommen.
+- Pro Spieler wird der aktuelle Schub im Debug-Overlay deutlicher angezeigt.
+
 ## [2.5.2] - 2026-04-15
 ### Geändert
 - Tutorial-Level 0 wurde wieder entfernt; die Progression startet nun direkt bei Level 1.

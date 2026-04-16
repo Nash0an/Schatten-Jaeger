@@ -16,6 +16,7 @@ Dieses Dokument hält die nächsten sinnvollen Ausbauschritte fest. Es beschreib
 - [ ] Einfachen Level-Editor oder JSON-Import-Konzept skizzieren.
 - [ ] Balancing-Pass für späte Level dokumentieren.
 - [ ] Optionalen Party-/Mehrspieler-Prototyp auf Basis des vorhandenen Koop-Modus untersuchen.
+- [ ] Ring-Force-Modus als separaten Prototyp planen: starres Ringmodell, aggregierte Spielerkraefte, serverautoritatives Tick-Modell.
 
 ## Langfristig
 - [ ] Online-Highscores.

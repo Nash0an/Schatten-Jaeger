@@ -20,6 +20,7 @@ Das Spiel ist auf dem Stand **v2.5.1**. Der Fokus lag zuletzt auf Stabilität, M
 - [docs/CHANGELOG.md](docs/CHANGELOG.md): Versions- und Bugfix-Historie.
 - [docs/ROADMAP.md](docs/ROADMAP.md): Nächste sinnvolle Ausbauschritte.
 - [docs/QUICK_CONTEXT.md](docs/QUICK_CONTEXT.md): Kurzkontext für den nächsten Einstieg.
+- [docs/RING_FORCE_MODE_CONCEPT.md](docs/RING_FORCE_MODE_CONCEPT.md): Plan fuer einen skalierbaren Ring-Mehrspieler-Modus mit aggregierter Physik.
 
 ### Bekannte Arbeitsweise
 - Änderungen zuerst gegen `game.js` und `levels.js` prüfen; ältere Doku kann hinterherhinken.

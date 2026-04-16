@@ -38,6 +38,8 @@ class SchattenJaeger {
         this.lightAngle = 0;
         this.lightSpread = Math.PI / 3;
         this.rotationSpeed = 0.08;
+        this.lastFrameTime = performance.now();
+        this.setupRingForcePrototype();
 
         this.bindEvents();
         this.resize();
@@ -102,6 +104,161 @@ class SchattenJaeger {
 
     getHighestSelectableLevel() {
         return this.masterModeActive ? this.getLastLevelId() : Math.min(this.saveData.unlockedLevel, this.getLastLevelId());
+    }
+
+    setupRingForcePrototype() {
+        this.ringForcePrototype = {
+            name: 'Innenring-Prototyp',
+            description: 'Spieler bewegen sich frei im Ring und schieben ihn nur ueber Kontakt mit der Innenwand.',
+            radius: 170,
+            thickness: 34,
+            pushSpeedScale: 220,
+            maxRingSpeed: 420,
+            innerPadding: 10,
+            contactThreshold: 0.5,
+            carryDragBase: 95,
+            carryDragOppose: 80,
+            position: { x: this.canvas ? this.canvas.width / 2 : 0, y: this.canvas ? this.canvas.height / 2 : 0 },
+            velocity: { x: 0, y: 0 },
+            netForce: { x: 0, y: 0 },
+            netSpeed: 0,
+            carryDrag: 0,
+            activePushers: 0,
+            players: [
+                {
+                    id: 1,
+                    color: '#5ec8ff',
+                    radius: 13,
+                    speed: 270,
+                    worldPos: { x: 0, y: 0 },
+                    spawnOffset: { x: -55, y: 0 },
+                    input: { x: 0, y: 0 },
+                    pushing: false,
+                    carried: false,
+                    pushVector: { x: 0, y: 0 },
+                    pushStrength: 0,
+                    carryResistance: 0,
+                    controlsLabel: 'P1 WASD'
+                },
+                {
+                    id: 2,
+                    color: '#ff8f5e',
+                    radius: 13,
+                    speed: 270,
+                    worldPos: { x: 0, y: 0 },
+                    spawnOffset: { x: 55, y: 0 },
+                    input: { x: 0, y: 0 },
+                    pushing: false,
+                    carried: false,
+                    pushVector: { x: 0, y: 0 },
+                    pushStrength: 0,
+                    carryResistance: 0,
+                    controlsLabel: 'P2 Pfeile'
+                }
+            ]
+        };
+
+        this.resetRingForceBody();
+    }
+
+    resetRingForceBody() {
+        if (!this.ringForcePrototype) return;
+
+        this.ringForcePrototype.position.x = this.canvas.width / 2;
+        this.ringForcePrototype.position.y = this.canvas.height / 2;
+        this.ringForcePrototype.velocity.x = 0;
+        this.ringForcePrototype.velocity.y = 0;
+        this.ringForcePrototype.netForce.x = 0;
+        this.ringForcePrototype.netForce.y = 0;
+        this.ringForcePrototype.netSpeed = 0;
+        this.ringForcePrototype.carryDrag = 0;
+        this.ringForcePrototype.activePushers = 0;
+        this.ringForcePrototype.players.forEach((player) => {
+            player.worldPos.x = this.ringForcePrototype.position.x + player.spawnOffset.x;
+            player.worldPos.y = this.ringForcePrototype.position.y + player.spawnOffset.y;
+            player.input.x = 0;
+            player.input.y = 0;
+            player.pushing = false;
+            player.carried = false;
+            player.pushVector.x = 0;
+            player.pushVector.y = 0;
+            player.pushStrength = 0;
+            player.carryResistance = 0;
+        });
+    }
+
+    startRingForcePrototype() {
+        this.resetRingForceBody();
+        this.state = 'RING_FORCE';
+        this.updateUI();
+        this.configureTouchControls();
+    }
+
+    getRingForceInnerLimit(player) {
+        return this.ringForcePrototype.radius - this.ringForcePrototype.thickness - this.ringForcePrototype.innerPadding - player.radius;
+    }
+
+    getRingForcePlayerWorldPos(player) {
+        return {
+            x: player.worldPos.x,
+            y: player.worldPos.y
+        };
+    }
+
+    getRingForcePlayerRelativePos(player) {
+        return {
+            x: player.worldPos.x - this.ringForcePrototype.position.x,
+            y: player.worldPos.y - this.ringForcePrototype.position.y
+        };
+    }
+
+    constrainRingForcePlayerInside(player) {
+        const relativePos = this.getRingForcePlayerRelativePos(player);
+        const distance = Math.sqrt(relativePos.x * relativePos.x + relativePos.y * relativePos.y);
+        const innerLimit = this.getRingForceInnerLimit(player);
+        if (distance <= innerLimit || distance === 0) return false;
+
+        const normalX = relativePos.x / distance;
+        const normalY = relativePos.y / distance;
+        player.worldPos.x = this.ringForcePrototype.position.x + normalX * innerLimit;
+        player.worldPos.y = this.ringForcePrototype.position.y + normalY * innerLimit;
+        return true;
+    }
+
+    handleRingForceHotkeys(e) {
+        if (!this.ringForcePrototype) return false;
+
+        if (e.code === 'Escape') {
+            e.preventDefault();
+            this.showMenu();
+            return true;
+        }
+
+        if (e.code === 'KeyR') {
+            e.preventDefault();
+            this.resetRingForceBody();
+            this.updateRingForceHud();
+            return true;
+        }
+
+        return false;
+    }
+
+    updateRingForceHud() {
+        if (this.state !== 'RING_FORCE') return;
+
+        const ring = this.ringForcePrototype;
+        const hudLvl = document.getElementById('hud-level');
+        const hudTarget = document.getElementById('hud-target');
+        const hudTimer = document.getElementById('hud-timer');
+        const hudScore = document.getElementById('hud-score');
+        const p1 = ring.players[0];
+        const p2 = ring.players[1];
+
+        if (hudLvl) hudLvl.innerText = 'Ring-Force Innenraum';
+        if (hudTarget) hudTarget.innerText = 'Nur Innenwand-Kontakt uebertraegt Schub auf den Ring.';
+        if (hudTimer) hudTimer.innerText = `Ring v=(${ring.velocity.x.toFixed(1)}, ${ring.velocity.y.toFixed(1)}) | Speed ${ring.netSpeed.toFixed(0)} | Schieber: ${ring.activePushers}`;
+        if (hudScore) hudScore.innerText = `P1 Schub ${p1.pushStrength.toFixed(0)} Drag ${p1.carryResistance.toFixed(0)} | P2 Schub ${p2.pushStrength.toFixed(0)} Drag ${p2.carryResistance.toFixed(0)}`;
     }
 
     initTouch() {
@@ -174,6 +331,10 @@ class SchattenJaeger {
     bindEvents() {
         window.addEventListener('resize', () => this.resize());
         window.addEventListener('keydown', (e) => {
+            if (this.state === 'RING_FORCE' && this.handleRingForceHotkeys(e)) {
+                return;
+            }
+
             this.keys[e.code] = true;
             
             // Passwort-Erkennung (nur im Menü)
@@ -385,6 +546,9 @@ class SchattenJaeger {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
         this.updatePillarPos();
+        if (this.ringForcePrototype && this.state !== 'RING_FORCE') {
+            this.resetRingForceBody();
+        }
         this.configureTouchControls();
     }
 
@@ -491,6 +655,8 @@ class SchattenJaeger {
             else if (lvl.targetType === 'survival') targetText = `${lvl.targetValue}s überleben`;
             else if (lvl.targetType === 'pacifist') targetText = `${lvl.targetValue}s (max ${lvl.maxScore} Pkt)`;
             if (hudTarget) hudTarget.innerText = `Ziel: ${targetText}`;
+        } else if (this.state === 'RING_FORCE') {
+            this.updateRingForceHud();
         }
     }
 
@@ -598,7 +764,157 @@ class SchattenJaeger {
         return inside;
     }
 
-    update() {
+    updateRingForce(dt) {
+        const ring = this.ringForcePrototype;
+        if (!ring) return;
+
+        const controlMaps = [
+            { left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS' },
+            { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' }
+        ];
+        let totalPushX = 0;
+        let totalPushY = 0;
+        let activePushers = 0;
+
+        ring.players.forEach((player, idx) => {
+            const controls = controlMaps[idx];
+            let inputX = 0;
+            let inputY = 0;
+            if (this.keys[controls.left]) inputX -= 1;
+            if (this.keys[controls.right]) inputX += 1;
+            if (this.keys[controls.up]) inputY -= 1;
+            if (this.keys[controls.down]) inputY += 1;
+
+            const inputMagnitude = Math.sqrt(inputX * inputX + inputY * inputY);
+            if (inputMagnitude > 0) {
+                inputX /= inputMagnitude;
+                inputY /= inputMagnitude;
+            }
+
+            player.input.x = inputX;
+            player.input.y = inputY;
+            player.pushing = false;
+            player.carried = false;
+            player.pushVector.x = 0;
+            player.pushVector.y = 0;
+            player.pushStrength = 0;
+            player.carryResistance = 0;
+
+            const desiredMoveX = inputX * player.speed * dt;
+            const desiredMoveY = inputY * player.speed * dt;
+            const relativePos = this.getRingForcePlayerRelativePos(player);
+            const nextX = relativePos.x + desiredMoveX;
+            const nextY = relativePos.y + desiredMoveY;
+            const nextDistance = Math.sqrt(nextX * nextX + nextY * nextY);
+            const innerLimit = this.getRingForceInnerLimit(player);
+
+            if (nextDistance <= innerLimit || inputMagnitude === 0) {
+                player.worldPos.x += desiredMoveX;
+                player.worldPos.y += desiredMoveY;
+                return;
+            }
+
+            const normalX = nextDistance > 0 ? nextX / nextDistance : 0;
+            const normalY = nextDistance > 0 ? nextY / nextDistance : 0;
+            player.worldPos.x = ring.position.x + normalX * innerLimit;
+            player.worldPos.y = ring.position.y + normalY * innerLimit;
+
+            const outwardIntent = inputX * normalX + inputY * normalY;
+            const overflow = Math.max(0, nextDistance - innerLimit);
+            if (overflow <= ring.contactThreshold || outwardIntent <= 0) return;
+
+            const pushRatio = Math.min(1, overflow / Math.max(player.speed * dt, 0.0001)) * outwardIntent;
+            const pushSpeed = pushRatio * ring.pushSpeedScale;
+            player.pushing = true;
+            player.pushVector.x = normalX * pushSpeed;
+            player.pushVector.y = normalY * pushSpeed;
+            player.pushStrength = pushSpeed;
+            totalPushX += player.pushVector.x;
+            totalPushY += player.pushVector.y;
+            activePushers++;
+        });
+
+        let desiredVelX = totalPushX;
+        let desiredVelY = totalPushY;
+        let desiredMagnitude = Math.sqrt(desiredVelX * desiredVelX + desiredVelY * desiredVelY);
+        let carryDrag = 0;
+
+        if (desiredMagnitude > 0) {
+            const dirX = desiredVelX / desiredMagnitude;
+            const dirY = desiredVelY / desiredMagnitude;
+
+            ring.players.forEach((player) => {
+                if (player.pushing) return;
+
+                const relativePos = this.getRingForcePlayerRelativePos(player);
+                const predictedRelX = relativePos.x - desiredVelX * dt;
+                const predictedRelY = relativePos.y - desiredVelY * dt;
+                const predictedDistance = Math.sqrt(predictedRelX * predictedRelX + predictedRelY * predictedRelY);
+                const innerLimit = this.getRingForceInnerLimit(player);
+                if (predictedDistance <= innerLimit) return;
+
+                player.carried = true;
+                const support = Math.max(0, player.input.x * dirX + player.input.y * dirY);
+                const oppose = Math.max(0, -(player.input.x * dirX + player.input.y * dirY));
+                const drag = ring.carryDragBase * (1 - support) + ring.carryDragOppose * oppose;
+                player.carryResistance = drag;
+                carryDrag += drag;
+            });
+
+            desiredMagnitude = Math.max(0, desiredMagnitude - carryDrag);
+            if (desiredMagnitude > ring.maxRingSpeed) {
+                desiredMagnitude = ring.maxRingSpeed;
+            }
+
+            desiredVelX = dirX * desiredMagnitude;
+            desiredVelY = dirY * desiredMagnitude;
+        }
+
+        ring.netForce.x = desiredVelX;
+        ring.netForce.y = desiredVelY;
+        ring.netSpeed = desiredMagnitude;
+        ring.carryDrag = carryDrag;
+        ring.activePushers = activePushers;
+        ring.velocity.x = desiredVelX;
+        ring.velocity.y = desiredVelY;
+
+        ring.position.x += ring.velocity.x * dt;
+        ring.position.y += ring.velocity.y * dt;
+
+        ring.players.forEach((player) => {
+            this.constrainRingForcePlayerInside(player);
+        });
+
+        const leftBound = ring.radius + 40;
+        const rightBound = this.canvas.width - ring.radius - 40;
+        const topBound = ring.radius + 40;
+        const bottomBound = this.canvas.height - ring.radius - 40;
+
+        if (ring.position.x < leftBound) {
+            ring.position.x = leftBound;
+            ring.velocity.x = 0;
+        } else if (ring.position.x > rightBound) {
+            ring.position.x = rightBound;
+            ring.velocity.x = 0;
+        }
+
+        if (ring.position.y < topBound) {
+            ring.position.y = topBound;
+            ring.velocity.y = 0;
+        } else if (ring.position.y > bottomBound) {
+            ring.position.y = bottomBound;
+            ring.velocity.y = 0;
+        }
+
+        this.updateRingForceHud();
+    }
+
+    update(dt = 1 / 60) {
+        if (this.state === 'RING_FORCE') {
+            this.updateRingForce(dt);
+            return;
+        }
+
         if (this.state !== 'PLAYING') return;
         if (this.spawnTimer > 0) this.spawnTimer--;
         if (this.missionSplashTimer > 0) this.missionSplashTimer--;
@@ -793,7 +1109,129 @@ class SchattenJaeger {
         this.updateUI();
     }
 
+    drawForceArrow(x, y, vx, vy, color, scale = 1) {
+        const length = Math.sqrt(vx * vx + vy * vy);
+        if (length < 0.001) return;
+
+        const nx = vx / length;
+        const ny = vy / length;
+        const arrowLen = Math.min(90, length * scale);
+        const endX = x + nx * arrowLen;
+        const endY = y + ny * arrowLen;
+
+        this.ctx.strokeStyle = color;
+        this.ctx.fillStyle = color;
+        this.ctx.lineWidth = 4;
+        this.ctx.beginPath();
+        this.ctx.moveTo(x, y);
+        this.ctx.lineTo(endX, endY);
+        this.ctx.stroke();
+
+        const headSize = 10;
+        this.ctx.beginPath();
+        this.ctx.moveTo(endX, endY);
+        this.ctx.lineTo(endX - nx * headSize - ny * headSize * 0.7, endY - ny * headSize + nx * headSize * 0.7);
+        this.ctx.lineTo(endX - nx * headSize + ny * headSize * 0.7, endY - ny * headSize - nx * headSize * 0.7);
+        this.ctx.closePath();
+        this.ctx.fill();
+    }
+
+    drawRingForce() {
+        const ring = this.ringForcePrototype;
+        if (!ring) return;
+
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.fillStyle = '#050505';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        this.ctx.save();
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        this.ctx.lineWidth = 1;
+        this.ctx.beginPath();
+        this.ctx.moveTo(this.canvas.width / 2, 0);
+        this.ctx.lineTo(this.canvas.width / 2, this.canvas.height);
+        this.ctx.moveTo(0, this.canvas.height / 2);
+        this.ctx.lineTo(this.canvas.width, this.canvas.height / 2);
+        this.ctx.stroke();
+
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+        this.ctx.beginPath();
+        this.ctx.arc(this.canvas.width / 2, this.canvas.height / 2, 12, 0, Math.PI * 2);
+        this.ctx.stroke();
+
+        this.ctx.translate(ring.position.x, ring.position.y);
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, ring.radius - ring.thickness, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        this.ctx.strokeStyle = '#ddd';
+        this.ctx.lineWidth = ring.thickness;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, ring.radius, 0, Math.PI * 2);
+        this.ctx.stroke();
+
+        this.ctx.setLineDash([8, 8]);
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        this.ctx.lineWidth = 1;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, this.getRingForceInnerLimit(ring.players[0]) + ring.players[0].radius, 0, Math.PI * 2);
+        this.ctx.stroke();
+        this.ctx.setLineDash([]);
+        this.ctx.restore();
+
+        ring.players.forEach((player) => {
+            const pos = this.getRingForcePlayerWorldPos(player);
+            this.ctx.fillStyle = player.color;
+            this.ctx.beginPath();
+            this.ctx.arc(pos.x, pos.y, player.radius, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            this.ctx.strokeStyle = player.pushing ? '#fff' : 'rgba(255,255,255,0.25)';
+            this.ctx.lineWidth = player.pushing ? 2 : 1;
+            this.ctx.beginPath();
+            this.ctx.arc(pos.x, pos.y, player.radius + 5, 0, Math.PI * 2);
+            this.ctx.stroke();
+
+            this.drawForceArrow(pos.x, pos.y, player.input.x * 80, player.input.y * 80, player.color, 0.6);
+            if (player.pushing) {
+                this.drawForceArrow(pos.x, pos.y, player.pushVector.x, player.pushVector.y, '#ffffff', 0.2);
+            }
+
+            this.ctx.fillStyle = '#fff';
+            this.ctx.font = '12px Segoe UI, sans-serif';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText(`P${player.id}`, pos.x, pos.y - 22);
+            this.ctx.fillStyle = player.pushing ? '#fff' : player.carried ? '#ffcc88' : 'rgba(255,255,255,0.65)';
+            const stateLabel = player.pushing
+                ? `SCHUB ${player.pushStrength.toFixed(0)}`
+                : player.carried
+                    ? `DRAG ${player.carryResistance.toFixed(0)}`
+                    : 'FREI';
+            this.ctx.fillText(stateLabel, pos.x, pos.y + 30);
+        });
+
+        this.drawForceArrow(ring.position.x, ring.position.y, ring.netForce.x, ring.netForce.y, '#44ff44', 0.12);
+
+        this.ctx.fillStyle = '#fff';
+        this.ctx.textAlign = 'left';
+        this.ctx.font = 'bold 24px Segoe UI, sans-serif';
+        this.ctx.fillText('Ring-Force Prototyp', 24, this.canvas.height - 150);
+        this.ctx.font = '15px Segoe UI, sans-serif';
+        this.ctx.fillStyle = '#ccc';
+        this.ctx.fillText(ring.description, 24, this.canvas.height - 120);
+        this.ctx.fillText('P1: WASD | P2: Pfeile | Nur Druck gegen die Innenwand bewegt den Ring | R Reset | Esc Menue', 24, this.canvas.height - 92);
+        this.ctx.fillText(`P1 Schub ${ring.players[0].pushStrength.toFixed(0)} Drag ${ring.players[0].carryResistance.toFixed(0)} | P2 Schub ${ring.players[1].pushStrength.toFixed(0)} Drag ${ring.players[1].carryResistance.toFixed(0)}`, 24, this.canvas.height - 64);
+        this.ctx.fillText(`Netto-Speed ${ring.netSpeed.toFixed(0)} | Gesamt-Drag ${ring.carryDrag.toFixed(0)} | Ringposition: (${ring.position.x.toFixed(1)}, ${ring.position.y.toFixed(1)})`, 24, this.canvas.height - 36);
+        this.ctx.fillText('Mitgeschleppte Spieler bremsen. Wer aktiv in Ringrichtung mitlaeuft, reduziert diesen Widerstand.', 24, this.canvas.height - 8);
+    }
+
     draw() {
+        if (this.state === 'RING_FORCE') {
+            this.drawRingForce();
+            return;
+        }
+
         const lvl = LEVELS[this.currentLevelIdx];
 
         this.ctx.save();
@@ -888,7 +1326,14 @@ class SchattenJaeger {
         this.ctx.restore();
     }
 
-    loop() { this.update(); this.draw(); requestAnimationFrame(() => this.loop()); }
+    loop() {
+        const now = performance.now();
+        const dt = Math.min(0.05, (now - this.lastFrameTime) / 1000 || 1 / 60);
+        this.lastFrameTime = now;
+        this.update(dt);
+        this.draw();
+        requestAnimationFrame(() => this.loop());
+    }
 }
 
 // Initialisierung
