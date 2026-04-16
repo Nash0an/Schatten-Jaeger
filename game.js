@@ -106,18 +106,23 @@ class SchattenJaeger {
         return this.masterModeActive ? this.getLastLevelId() : Math.min(this.saveData.unlockedLevel, this.getLastLevelId());
     }
 
+    getBasePlayerSpeedPerSecond() {
+        return this.player.speed * 60;
+    }
+
     setupRingForcePrototype() {
+        const baseSpeed = this.getBasePlayerSpeedPerSecond();
         this.ringForcePrototype = {
             name: 'Innenring-Prototyp',
-            description: 'Spieler bewegen sich frei im Ring und schieben ihn nur ueber Kontakt mit der Innenwand.',
+            description: 'Spieler bewegen sich im Tempo des Hauptspiels und schieben den Ring nur ueber Innenwand-Kontakt.',
             radius: 170,
             thickness: 34,
-            pushSpeedScale: 220,
-            maxRingSpeed: 420,
+            pushSpeedScale: baseSpeed * 0.75,
+            maxRingSpeed: baseSpeed * 1.4,
             innerPadding: 10,
             contactThreshold: 0.5,
-            carryDragBase: 95,
-            carryDragOppose: 80,
+            carryDragBase: baseSpeed * 0.32,
+            carryDragOppose: baseSpeed * 0.26,
             position: { x: this.canvas ? this.canvas.width / 2 : 0, y: this.canvas ? this.canvas.height / 2 : 0 },
             velocity: { x: 0, y: 0 },
             netForce: { x: 0, y: 0 },
@@ -129,7 +134,7 @@ class SchattenJaeger {
                     id: 1,
                     color: '#5ec8ff',
                     radius: 13,
-                    speed: 270,
+                    speed: baseSpeed,
                     worldPos: { x: 0, y: 0 },
                     spawnOffset: { x: -55, y: 0 },
                     input: { x: 0, y: 0 },
@@ -144,7 +149,7 @@ class SchattenJaeger {
                     id: 2,
                     color: '#ff8f5e',
                     radius: 13,
-                    speed: 270,
+                    speed: baseSpeed,
                     worldPos: { x: 0, y: 0 },
                     spawnOffset: { x: 55, y: 0 },
                     input: { x: 0, y: 0 },
