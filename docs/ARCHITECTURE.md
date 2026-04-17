@@ -1,127 +1,196 @@
 # Architektur: Schatten-Jäger
 
-Dieses Dokument beschreibt den aktuellen technischen Stand von **Schatten-Jäger** nach dem Menü-Umbau für `Labyrinth` und nach der Integration der Ring-Modi in die normalen Level.
+Dieses Dokument beschreibt den aktuellen technischen Stand von `Schatten-Jäger` so, dass morgen oder ein anderer Entwickler ohne Rekonstruktion direkt weiterarbeiten kann.
 
 ## 1. Projektform
-- Reines Browser-Spiel ohne Build-Prozess oder externe Libraries.
-- Rendering vollständig über die HTML5 Canvas API.
+- Reines Browser-Spiel ohne Build-Prozess.
+- Rendering über HTML5 Canvas.
 - Audio über Web Audio API.
-- Kernlogik fast komplett in einer zentralen Klasse `SchattenJaeger` in `game.js`.
+- Kernlogik zentral in `game.js`.
 
 ## 2. Wichtige Dateien
 - `index.html`: Canvas, HUD, Menü, Win-/Lose-Overlays.
 - `styles.css`: HUD, Menü, Touch-Joysticks und Menü-Layout.
-- `levels.js`: Hauptlevelsatz `LEVELS` plus Zusatzkonfigurationen wie verzögerte Sammelziele.
-- `game.js`: State-Machine, Eingabe, Gegner, Rendering, Ring-Physik, Progression, Menülogik.
-- `PROJECT_STATUS.md`: Überblick über den aktuellen Entwicklungsstand.
-- `docs/QUICK_CONTEXT.md`: Kurzkontext für schnellen Wiedereinstieg.
-- `docs/LABYRINTH_PREP.md`: Vorbereitungsstand und offene Entscheidungen für den nächsten Spielzweig.
+- `levels.js`: klassischer Hauptlevelsatz `LEVELS` und separater `LABYRINTH_LEVELS`.
+- `game.js`: State-Machine, Eingabe, Menülogik, Ring-Physik, Hauptspiel, Labyrinth.
+- `assets/images/`: Verzeichnis für grafische Assets (Hintergründe, Texturen).
+- `PROJECT_STATUS.md`: komprimierter Projektstatus.
+- `docs/QUICK_CONTEXT.md`: schnellster Wiedereinstieg.
+- `docs/DEV_HANDOFF.md`: praktische Übergabe mit Startpunkten, offenen Aufgaben und Testfokus.
+- `docs/LABYRINTH_PREP.md`: offener Reststand für Labyrinth-Balancing und Ausbau.
 
-## 3. Zustände und Modi
+## 3. Rendering-System
+Das Spiel nutzt ein geschichtetes Rendering auf einem einzigen Canvas:
+1. **Hintergrund:** `drawBackground()` zeichnet modus-abhängige Bilder (`bg-classic.png` / `bg-labyrinth.png`), ein technisches Gitter und eine Vignette.
+2. **Schatten/Licht:** Dynamische Berechnung von Schatten-Polygonen basierend auf der Säulenposition.
+3. **Welt-Objekte:** Pfade (im Labyrinth mit Holztextur), Gegner, Partikel und Spielerfiguren.
+4. **UI/HUD:** Overlay-Elemente direkt auf dem Canvas oder als HTML-Overlays.
 
-### Laufende Zustände
-- `MENU`: Startmenü und Levelauswahl.
-- `PLAYING`: Normale Spielschleife.
-- `WIN`: Level geschafft.
-- `LOSE`: Spieler wurde getroffen oder Missionsziel ist gescheitert.
-- `RING_FORCE`: Separater Physik-Prototyp außerhalb der normalen Level.
+## 4. Entwickler-Start
 
-### Aktive Spielmodi im Hauptspiel
-- `SOLO`: Ein Spieler trägt Licht und Bewegung.
-- `COOP`: `P1` bewegt, `P2` steuert das gerichtete Licht.
-- `RING_SOLO`: Ring-Mechanik in normalen Leveln mit einem Spieler im Ring.
-- `RING_DUO`: Ring-Mechanik in normalen Leveln mit zwei Spielern im Ring.
-- `RING_TRIO`: Ring-Mechanik in normalen Leveln mit drei Spielern im Ring.
+Wenn du nach einer Pause wieder einsteigst, nimm diese Reihenfolge:
+- `docs/QUICK_CONTEXT.md` für den 60-Sekunden-Überblick.
+- `docs/DEV_HANDOFF.md` für die direkte Arbeitsaufnahme.
+- `docs/LABYRINTH_PREP.md`, wenn du an Labyrinth weitermachst.
+- Danach erst `game.js` und `levels.js`.
 
-### Menübildschirme
-Das Menü nutzt aktuell keinen sichtbaren Reiter mehr, sondern zwei getrennte Panels:
-- `panel-classic`: Überschrift `SCHATTEN-JÄGER`, enthält die bestehenden Hauptmodi und `RINGS`.
-- `panel-labyrinth`: Überschrift `LABYRINTH`, aktuell als vorbereiteter Platzhalterbildschirm.
+## 4. Zustände
+- `MENU`
+- `PLAYING`
+- `WIN`
+- `LOSE`
+- `RING_FORCE`
 
-Der Wechsel erfolgt über `setMenuTab()` in `game.js`. Die Umschaltbuttons sitzen rechts oben in der Menü-Kopfzeile.
+`RING_FORCE` bleibt eine separate Sandbox. `PLAYING` deckt sowohl klassisches Hauptspiel als auch Labyrinth ab.
 
-## 4. Kernsysteme
+## 5. Aktive Spielmodi
 
-### 4.1 Schatten- und Lichtsystem
-- `getShadowPoly()` berechnet den tödlichen Schatten über Tangenten an die Säule.
-- Im `SOLO`- und Ring-Spiel ist das Licht radial um die aktive Trägerposition.
-- Im `COOP`-Spiel ist das Licht ein gerichteter Kegel über `lightAngle` und `lightSpread`.
+### Klassisches Hauptspiel
+- `SOLO`
+- `COOP`
+- `RING_SOLO`
+- `RING_DUO`
+- `RING_TRIO`
 
-### 4.2 Gegner
-- Gegner spawnen an den Bildschirmrändern.
-- Bewegung immer in Richtung der aktiven Spieler-/Trägerposition.
-- Tod bei Kreis-Kollision mit aktiven Spielerkörpern.
+### Labyrinth
+- `LABYRINTH_RING_SOLO`
+- `LABYRINTH_RING_DUO`
+- `LABYRINTH_RING_TRIO`
+
+## 6. Hauptspiel-Systeme
+
+### Schatten und Licht
+- `getShadowPoly()` berechnet den Schattenbereich der Säule.
+- Im `SOLO`- und Ring-Spiel ist das Licht radial.
+- Im klassischen `COOP` ist das Licht gerichtet über `lightAngle`.
+
+### Gegner
+- Gegner spawnen an Bildschirmrändern.
+- Gegner laufen auf den aktiven Träger-/Spielerpunkt zu.
+- Tod über Kreis-Kollision.
 - Tötung im Schatten via `isPointInPoly()`.
 
-### 4.3 Combo- und Punkte-System
-- Gegner werden in `comboGroups` gruppiert.
+### Combo-System
+- Gruppenbildung über `comboGroups`.
 - Punkteformel: `10 * 2^(groupSize - 1)`.
 - Combo-Größe beeinflusst Farbe, Partikel und Shake.
 
-### 4.4 Zusatz-Missionsziele
-Spätere Level können ein verzögertes Sammelziel aktivieren:
-- Konfiguration in `levels.js` über `collectHearts`.
-- Aktuell visuell als **Kirschen** gerendert.
-- Spawn nach kurzer Anfangsverzögerung.
-- Vier Sammelobjekte erscheinen näher um die Mitte, je eines pro innerem Quadranten.
-- Sieg wird blockiert, bis das Hauptziel **und** alle Kirschen erfüllt sind.
+### Zusatzziele
+- Spätere Hauptlevel können früh spawnende Kirschen aktivieren.
+- Sieg gilt dann erst, wenn Hauptziel und Kirschen erfüllt sind.
 
-## 5. Ring-System
+## 7. Ring-System
 
-### 5.1 Ring-Force-Prototyp
-Der Modus `RING_FORCE` ist eine isolierte Sandbox:
-- Spieler bewegen sich frei im Ringinneren.
-- Nur Druck gegen die Innenwand verschiebt den Ring.
-- Kein Nachgleiten ohne aktiven Druck.
-- Umschaltbar zwischen 1, 2 und 3 Spielern.
+### Ring-Force-Sandbox
+- Freie Bewegung im Ringinneren.
+- Ringbewegung nur über Druck gegen die Innenwand.
+- Kein freies Nachgleiten.
+- Sandbox kann 1, 2 oder 3 Spieler simulieren.
 
-### 5.2 Ring in echten Leveln
-Die Ring-Physik wurde in die normalen Level integriert:
-- Der Ringmittelpunkt ist der eigentliche Licht-/Trägerpunkt.
-- Zusätzliche Spielerkörper laufen im Ringinneren.
-- Gegnerkontakt mit einem aktiven Ring-Spieler oder dem Trägerpunkt führt zum Tod.
-- Der Ring wird gegen Spielfeldrand und Säule begrenzt.
+### Ring in echten Levels
+- Der Ringmittelpunkt ist Träger- und Lichtpunkt.
+- Aktive Spielerkörper laufen im Ringinneren.
+- Gegnerkontakt mit aktiven Ring-Spielern oder Trägerpunkt ist tödlich.
 
-### 5.3 Ring-Eingaben
+### Ring-Eingaben
 - `P1`: `WASD`
 - `P2`: Pfeiltasten
 - `P3`: `H`, `B`, `N`, `M`
 
-## 6. Menü und Progression
+## 8. Labyrinth-System
 
-### 6.1 Levelauswahl
-- Alle Hauptlevel sind jederzeit direkt anwählbar.
-- Erledigte Level sind hell markiert.
-- Unerledigte Level bleiben dunkel, sind aber klickbar.
-- Der alte zentrale Startbutton wurde entfernt, weil er durch die direkte Levelwahl überflüssig geworden ist.
+### Grundidee
+`Labyrinth` ist ein Parkour-Zweig:
+- Der Ring fährt einen Kurs entlang.
+- Verlässt der Ring den Kurs, geht das Level verloren.
+- Das Ziel muss innerhalb eines Zeitlimits erreicht werden.
 
-### 6.2 Niederlage und Überspringen
-- Im Lose-Overlay gibt es `Level überspringen`.
-- Übersprungene Level gelten nicht als geschafft.
+### Leveldaten
+Der Labyrinth-Zweig nutzt `LABYRINTH_LEVELS`:
+- 50 Level
+- eigener Name pro Level
+- steigender Schwierigkeitswert
+- Trackbreite pro Level
+- normalisierte Pfadpunkte
 
-### 6.3 Persistenz
-- Fortschritt liegt in `localStorage` unter `sj_v2_data`.
-- Gespeichert werden Bestwerte pro Level in `saveData.bests`.
-- `masterModeActive` ist nur sitzungsbasiert.
+Aktuell werden diese Level algorithmisch erzeugt und sind als erste Testreihe gedacht.
 
-## 7. Eingabe
+### Laufzeitlogik
+Beim Start eines Labyrinth-Levels wird:
+- der Pfad auf die aktuelle Bildschirmgröße skaliert,
+- die Parkour-Länge berechnet,
+- daraus ein Zeitlimit für den aktuellen Modus abgeleitet,
+- der Ring auf den Startpunkt gesetzt.
+- vor dem eigentlichen Lauf ein Start-Countdown `3, 2, 1, LOS` gezeigt.
 
-### Desktop
-- `SOLO`: `WASD` oder Pfeiltasten bewegen.
-- `COOP`: `WASD` bewegt, Pfeiltasten drehen das Licht.
-- Ring-Modi: `WASD`, Pfeile, `HBNM`.
+Wichtig:
+- Bewegung ist bei sichtbarem `LOS` erlaubt.
+- Die Labyrinth-Zeit startet ebenfalls mit `LOS`, nicht vorher.
 
-### Touch
-- Touch-Steuerung wird erst nach echtem `touchstart` aktiviert.
+### Zeit- und Koop-Logik
+- `SOLO` ist aktuell bewusst leicht lockerer als der erste Entwurf gerechnet.
+- `DUO` und `TRIO` werden absichtlich auf Kooperation gerechnet.
+- In `DUO`/`TRIO` wird Fortschritt stark abgebremst, wenn nicht mindestens zwei Spieler gleichzeitig aktiv schieben.
+
+Dieser Bereich ist aktuell der wichtigste Balancing-Punkt im Projekt.
+
+### Wichtige Code-Einstiegspunkte
+- `getLevelsForMode()`: trennt klassischen und Labyrinth-Levelsatz.
+- `setMenuTab()` und `setMode()`: Menü- und Modusumschaltung.
+- `startLevel()`: zentraler Einstieg für Levelstart und Modus-Setup.
+- `setupLabyrinthRun()`: baut die Laufzeitdaten für den Parkour.
+- `updateLabyrinth()`: Countdown, Zeitlogik, Koop-Zwang, Absturz, Ziel.
+- `drawLabyrinth()`: kompletter Labyrinth-Renderpfad.
+- `updateRingLevelMovement()`: Ring-Steuerung in echten Levels.
+
+### Track-Prüfung
+- Die Ringmitte wird gegen die nächste Segmentdistanz des Parkours geprüft.
+- Wird die erlaubte Distanz überschritten, gilt der Ring als heruntergefallen.
+- Das Ziel zählt nur bei genügend Fortschritt plus Nähe zum Finishpunkt.
+
+## 9. Menü
+Das Menü nutzt zwei Panels:
+- `panel-classic`
+- `panel-labyrinth`
+
+Der Wechsel erfolgt über `setMenuTab()`.
+
+### Classic-Panel
+- klassische Hauptmodi
+- Ring-Modi
+- Hauptlevelauswahl
+
+### Labyrinth-Panel
+- eigene Überschrift `LABYRINTH`
+- nur `RINGS`-Gruppe
+- eigene Labyrinth-Levelauswahl
+
+## 10. Progression und Savegame
+- Savegame-Key: `sj_v2_data`
+- Klassische Bestwerte: `saveData.bests`
+- Labyrinth-Bestwerte: `saveData.labyrinthBests`
+- `masterModeActive` bleibt sitzungsbasiert
+
+Alle Levels sind direkt anwählbar. Der alte zentrale Startbutton wurde entfernt.
+
+## 11. Touch
+- Touch wird erst nach echtem `touchstart` aktiviert.
 - Linker Joystick: Bewegung.
 - Rechter Joystick: nur im klassischen `COOP` für Lichtrotation.
 
-## 8. Aktuelle Menü-Realität für Labyrinth
-`Labyrinth` ist derzeit **nur vorbereitet**, noch nicht spielbar:
-- eigener Menübildschirm mit eigener Überschrift,
-- gleicher Grundrahmen wie das Hauptmenü,
-- keine obere klassische `Solo/Koop`-Gruppe,
-- `RINGS`-Sektion mit drei Platzhalterkarten,
-- Platzhalter für spätere Labyrinth-Levelauswahl.
+Für `LABYRINTH_RING_DUO` und `LABYRINTH_RING_TRIO` gibt es noch kein wirklich gutes Touch-Konzept.
 
-Die eigentliche Labyrinth-Logik existiert noch nicht. Dafür ist `docs/LABYRINTH_PREP.md` die wichtigste Startdatei.
+## 12. Stabil vs. offen
+
+### Stabil
+- Klassisches Hauptspiel mit `SOLO` und `COOP`.
+- Ring-Modi in normalen Levels.
+- Direkte Levelwahl und Skip-Logik.
+- Separater Labyrinth-Menüfluss.
+- Labyrinth-Grundengine mit Countdown, Zeitlimit, Absturz und Ziel.
+
+### Offen
+- Labyrinth-Zeiten vor allem für `DUO` und `TRIO`.
+- Qualität der generierten Labyrinth-Kurse.
+- Touch-Konzept für mehr als einen Ring-Spieler im Labyrinth.
+- Feintuning von Trackbreiten, Kurvenhärte und Koop-Zwang.

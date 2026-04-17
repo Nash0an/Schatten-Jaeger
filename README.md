@@ -4,8 +4,8 @@ Ein Browser-Arcade-Spiel um Licht, Schatten und präzise Bewegung. Du steuerst e
 
 ## Spielkonzept
 - **Kernidee:** Gegner sterben nur im Schatten der zentralen Säule.
-- **Modi:** `SOLO` mit gemeinsamer Bewegungssteuerung und `KOOP`, bei dem Bewegung und Lichtrotation getrennt sind.
-- **Inhalt:** 51 Level (`0` bis `50`) mit `score`, `survival` und `pacifist`-Zielen.
+- **Klassisch:** 50 Level mit `score`, `survival` und `pacifist`-Zielen.
+- **Labyrinth:** Ein Parkour-Zweig, bei dem ein Ring auf einem Holzsteg balanciert werden muss. 50 separate Parkour-Level mit Zeitlimit.
 - **Progression:** Freigeschaltete Level und Bestwerte werden in `localStorage` unter `sj_v2_data` gespeichert.
 
 ## Steuerung
@@ -26,10 +26,11 @@ Ein Browser-Arcade-Spiel um Licht, Schatten und präzise Bewegung. Du steuerst e
 
 ## Projektstruktur
 - `index.html`: UI-Struktur, Overlays und Canvas.
-- `game.js`: Hauptlogik, State-Machine, Input, Rendering, Audio.
-- `levels.js`: Leveldaten und Missionsparameter.
-- `styles.css`: Layout, HUD, Menü und Touch-UI.
-- `docs/`: Architektur, Changelog, Roadmap und Arbeitskontext.
+- `game.js`: Hauptlogik, State-Machine, Rendering, Audio.
+- `levels.js`: Leveldaten (Klassisch & Labyrinth).
+- `assets/images/`: Hintergründe und Texturen.
+- `styles.css`: Layout, HUD und Menü.
+- `docs/`: Architektur, Changelog und Dev-Handoff.
 
 ## Start
 Es gibt keinen Build-Schritt. Für lokale Tests reicht:

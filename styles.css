@@ -34,26 +34,40 @@ canvas { display: block; }
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    background: var(--ui-bg);
+    background-color: #000;
+    background-size: cover;
+    background-position: center;
     z-index: 10;
-    transition: opacity 0.3s;
+    transition: opacity 0.3s, background 0.5s ease;
+}
+
+.overlay::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.5); /* Aufgehellt von 0.7 */
+    z-index: -1;
 }
 
 .hidden { display: none !important; opacity: 0; }
 
 .ui-panel {
+    position: relative;
     text-align: center;
     padding: 30px;
     border: 2px solid var(--primary);
     border-radius: 15px;
-    max-width: 550px;
-    background: #111;
+    max-width: 700px; /* Einheitliche maximale Breite */
+    background: rgba(17, 17, 17, 0.9);
+    box-shadow: 0 0 30px rgba(0,0,0,0.5);
+    z-index: 11;
 }
 
 .menu-panel {
-    width: min(760px, calc(100vw - 32px));
-    max-width: 760px;
-    max-height: calc(100vh - 32px);
+    width: min(700px, calc(100vw - 32px)); /* Einheitliche Breite für beide Menüs */
+    max-width: 700px;
+    height: auto;
+    max-height: calc(100vh - 60px);
     overflow-y: auto;
     box-sizing: border-box;
 }
@@ -83,13 +97,20 @@ canvas { display: block; }
     min-width: 156px;
     min-height: 156px;
     margin: 0;
-    border-radius: 999px;
+    border-radius: 50%;
     background: transparent;
     color: var(--primary);
     border: 1px solid #555;
     font-size: 15px;
-    line-height: 1.2;
-    padding: 20px;
+    font-weight: bold;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
 }
 
 .menu-switch-btn:hover {
@@ -199,24 +220,8 @@ button:active { transform: scale(0.95); }
     background: transparent;
 }
 
-.level-select-placeholder {
-    margin-top: 20px;
-    height: 320px;
-    border: 1px solid #222;
-    border-radius: 10px;
-    background:
-        linear-gradient(rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
-        repeating-linear-gradient(
-            90deg,
-            transparent 0,
-            transparent calc(20% - 8px),
-            rgba(255, 255, 255, 0.04) calc(20% - 8px),
-            rgba(255, 255, 255, 0.04) 20%
-        );
-    opacity: 0.4;
-}
-
-#level-select {
+#level-select,
+#labyrinth-level-select {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     gap: 8px;

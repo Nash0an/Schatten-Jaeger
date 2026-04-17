@@ -24,6 +24,15 @@ class SchattenJaeger {
         this.spawnTimer = 0;
         this.missionSplashTimer = 0;
         this.collectibleObjective = null;
+        this.labyrinthRun = null;
+        this.levelStartCountdown = 0;
+
+        this.bgClassic = new Image();
+        this.bgClassic.src = 'assets/images/bg-classic.png';
+        this.bgLabyrinth = new Image();
+        this.bgLabyrinth.src = 'assets/images/bg-labyrinth.png';
+        this.texWood = new Image();
+        this.texWood.src = 'assets/images/tex-wood.png';
 
         // Touch Data
         this.isTouchDevice = false; // Startet immer als false
@@ -45,6 +54,7 @@ class SchattenJaeger {
 
         this.bindEvents();
         this.resize();
+        this.setMenuTab(this.currentMenuTab, false); // Initialen Hintergrund setzen
         this.updateLevelSelect();
         this.loop();
     }
@@ -65,7 +75,7 @@ class SchattenJaeger {
     }
 
     createFreshSaveData() {
-        return { unlockedLevel: this.getFirstLevelId(), bests: {} };
+        return { unlockedLevel: this.getFirstLevelId(), bests: {}, labyrinthBests: {} };
     }
 
     getHighestCompletedLevel() {
@@ -86,6 +96,16 @@ class SchattenJaeger {
 
         if (typeof this.saveData.unlockedLevel !== 'number' || Number.isNaN(this.saveData.unlockedLevel)) {
             this.saveData.unlockedLevel = firstLevelId;
+            needsSave = true;
+        }
+
+        if (!this.saveData.bests || typeof this.saveData.bests !== 'object') {
+            this.saveData.bests = {};
+            needsSave = true;
+        }
+
+        if (!this.saveData.labyrinthBests || typeof this.saveData.labyrinthBests !== 'object') {
+            this.saveData.labyrinthBests = {};
             needsSave = true;
         }
 
@@ -118,15 +138,45 @@ class SchattenJaeger {
         return this.player.speed * 60;
     }
 
+    isLabyrinthMode() {
+        return this.gameMode === 'LABYRINTH_RING_SOLO'
+            || this.gameMode === 'LABYRINTH_RING_DUO'
+            || this.gameMode === 'LABYRINTH_RING_TRIO';
+    }
+
     isRingGameMode() {
-        return this.gameMode === 'RING_SOLO' || this.gameMode === 'RING_DUO' || this.gameMode === 'RING_TRIO';
+        return this.gameMode === 'RING_SOLO'
+            || this.gameMode === 'RING_DUO'
+            || this.gameMode === 'RING_TRIO'
+            || this.isLabyrinthMode();
     }
 
     getRingPlayerCountForMode() {
-        if (this.gameMode === 'RING_SOLO') return 1;
-        if (this.gameMode === 'RING_TRIO') return 3;
-        if (this.gameMode === 'RING_DUO') return 2;
+        if (this.gameMode === 'RING_SOLO' || this.gameMode === 'LABYRINTH_RING_SOLO') return 1;
+        if (this.gameMode === 'RING_TRIO' || this.gameMode === 'LABYRINTH_RING_TRIO') return 3;
+        if (this.gameMode === 'RING_DUO' || this.gameMode === 'LABYRINTH_RING_DUO') return 2;
         return 0;
+    }
+
+    getLevelsForMode(mode = this.gameMode) {
+        if (mode === 'LABYRINTH_RING_SOLO' || mode === 'LABYRINTH_RING_DUO' || mode === 'LABYRINTH_RING_TRIO') {
+            return LABYRINTH_LEVELS;
+        }
+        return LEVELS;
+    }
+
+    getLevelSetForMenuTab(tab = this.currentMenuTab) {
+        return tab === 'LABYRINTH' ? LABYRINTH_LEVELS : LEVELS;
+    }
+
+    getBestStoreForMode(mode = this.gameMode) {
+        return mode === 'LABYRINTH_RING_SOLO' || mode === 'LABYRINTH_RING_DUO' || mode === 'LABYRINTH_RING_TRIO'
+            ? this.saveData.labyrinthBests
+            : this.saveData.bests;
+    }
+
+    getBestStoreForMenuTab(tab = this.currentMenuTab) {
+        return tab === 'LABYRINTH' ? this.saveData.labyrinthBests : this.saveData.bests;
     }
 
     getRingSpawnLayout(count, scale = 1) {
@@ -404,26 +454,59 @@ class SchattenJaeger {
 
     setMode(mode) {
         this.gameMode = mode;
-        document.getElementById('mode-solo').classList.toggle('selected', mode === 'SOLO');
-        document.getElementById('mode-coop').classList.toggle('selected', mode === 'COOP');
-        document.getElementById('mode-ring-solo').classList.toggle('selected', mode === 'RING_SOLO');
-        document.getElementById('mode-ring-duo').classList.toggle('selected', mode === 'RING_DUO');
-        document.getElementById('mode-ring-trio').classList.toggle('selected', mode === 'RING_TRIO');
-        this.setMenuTab('CLASSIC');
+        const targetTab = this.isLabyrinthMode() ? 'LABYRINTH' : 'CLASSIC';
+        this.setMenuTab(targetTab, false);
+        this.refreshModeSelection();
+        this.updateLevelSelect();
     }
 
-    setMenuTab(tab) {
+    refreshModeSelection() {
+        const modeMap = [
+            ['mode-solo', this.gameMode === 'SOLO'],
+            ['mode-coop', this.gameMode === 'COOP'],
+            ['mode-ring-solo', this.gameMode === 'RING_SOLO'],
+            ['mode-ring-duo', this.gameMode === 'RING_DUO'],
+            ['mode-ring-trio', this.gameMode === 'RING_TRIO'],
+            ['mode-lab-solo', this.gameMode === 'LABYRINTH_RING_SOLO'],
+            ['mode-lab-duo', this.gameMode === 'LABYRINTH_RING_DUO'],
+            ['mode-lab-trio', this.gameMode === 'LABYRINTH_RING_TRIO']
+        ];
+
+        modeMap.forEach(([id, selected]) => {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('selected', selected);
+        });
+    }
+
+    setMenuTab(tab, adjustMode = true) {
         this.currentMenuTab = tab;
 
+        const menuOverlay = document.getElementById('menu-overlay');
         const classicTab = document.getElementById('tab-classic');
         const labyrinthTab = document.getElementById('tab-labyrinth');
         const classicPanel = document.getElementById('panel-classic');
         const labyrinthPanel = document.getElementById('panel-labyrinth');
 
+        if (menuOverlay) {
+            const bgUrl = tab === 'LABYRINTH' ? 'assets/images/bg-labyrinth.png' : 'assets/images/bg-classic.png';
+            menuOverlay.style.backgroundImage = `url('${bgUrl}')`;
+        }
+
         if (classicTab) classicTab.classList.toggle('selected', tab === 'CLASSIC');
         if (labyrinthTab) labyrinthTab.classList.toggle('selected', tab === 'LABYRINTH');
         if (classicPanel) classicPanel.classList.toggle('active', tab === 'CLASSIC');
         if (labyrinthPanel) labyrinthPanel.classList.toggle('active', tab === 'LABYRINTH');
+
+        if (adjustMode) {
+            if (tab === 'LABYRINTH' && !this.isLabyrinthMode()) {
+                this.gameMode = 'LABYRINTH_RING_SOLO';
+            } else if (tab === 'CLASSIC' && this.isLabyrinthMode()) {
+                this.gameMode = 'SOLO';
+            }
+        }
+
+        this.refreshModeSelection();
+        this.updateLevelSelect();
     }
 
     bindEvents() {
@@ -456,6 +539,9 @@ class SchattenJaeger {
         const ringSoloCard = document.getElementById('mode-ring-solo');
         const ringDuoCard = document.getElementById('mode-ring-duo');
         const ringTrioCard = document.getElementById('mode-ring-trio');
+        const labyrinthSoloCard = document.getElementById('mode-lab-solo');
+        const labyrinthDuoCard = document.getElementById('mode-lab-duo');
+        const labyrinthTrioCard = document.getElementById('mode-lab-trio');
         const classicTab = document.getElementById('tab-classic');
         const labyrinthTab = document.getElementById('tab-labyrinth');
         if (soloCard) soloCard.addEventListener('pointerup', () => this.setMode('SOLO'));
@@ -463,6 +549,9 @@ class SchattenJaeger {
         if (ringSoloCard) ringSoloCard.addEventListener('pointerup', () => this.setMode('RING_SOLO'));
         if (ringDuoCard) ringDuoCard.addEventListener('pointerup', () => this.setMode('RING_DUO'));
         if (ringTrioCard) ringTrioCard.addEventListener('pointerup', () => this.setMode('RING_TRIO'));
+        if (labyrinthSoloCard) labyrinthSoloCard.addEventListener('pointerup', () => this.setMode('LABYRINTH_RING_SOLO'));
+        if (labyrinthDuoCard) labyrinthDuoCard.addEventListener('pointerup', () => this.setMode('LABYRINTH_RING_DUO'));
+        if (labyrinthTrioCard) labyrinthTrioCard.addEventListener('pointerup', () => this.setMode('LABYRINTH_RING_TRIO'));
         if (classicTab) classicTab.addEventListener('pointerup', () => this.setMenuTab('CLASSIC'));
         if (labyrinthTab) labyrinthTab.addEventListener('pointerup', () => this.setMenuTab('LABYRINTH'));
 
@@ -632,19 +721,144 @@ class SchattenJaeger {
     resize() {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
-        this.updatePillarPos();
-        if (this.ringForcePrototype && this.state !== 'RING_FORCE') {
+        if (this.state === 'PLAYING' && this.isLabyrinthMode()) {
+            this.setupLabyrinthRun(this.getCurrentLevel());
+            this.ringForcePrototype.activePlayerCount = this.getRingPlayerCountForMode();
+            this.ringForcePrototype.radius = 54;
+            this.ringForcePrototype.thickness = 12;
+            this.ringForcePrototype.innerPadding = 1;
             this.resetRingForceBody();
+            this.ringForcePrototype.position.x = this.player.x;
+            this.ringForcePrototype.position.y = this.player.y;
+            const spawnLayout = this.getRingSpawnLayout(this.ringForcePrototype.activePlayerCount, 0.7);
+            this.getActiveRingPlayers().forEach((player, idx) => {
+                player.worldPos.x = this.ringForcePrototype.position.x + spawnLayout[idx].x;
+                player.worldPos.y = this.ringForcePrototype.position.y + spawnLayout[idx].y;
+            });
+        } else {
+            this.updatePillarPos();
+            if (this.ringForcePrototype && this.state !== 'RING_FORCE') {
+                this.resetRingForceBody();
+            }
         }
         this.configureTouchControls();
     }
 
     updatePillarPos() {
-        const lvl = LEVELS[this.currentLevelIdx];
+        const lvl = this.getLevelsForMode()[this.currentLevelIdx];
         if (!lvl || lvl.pillarBehavior === 'static' || lvl.pillarBehavior === 'shrinking') {
             this.pillar.x = this.canvas.width / 2;
             this.pillar.y = this.canvas.height / 2;
         }
+    }
+
+    getCurrentLevel() {
+        return this.getLevelsForMode()[this.currentLevelIdx];
+    }
+
+    getScaledLabyrinthPath(level) {
+        const paddingX = 90;
+        const paddingY = 90;
+        const usableWidth = this.canvas.width - paddingX * 2;
+        const usableHeight = this.canvas.height - paddingY * 2;
+        return level.path.map((pt) => ({
+            x: paddingX + pt.x * usableWidth,
+            y: paddingY + pt.y * usableHeight
+        }));
+    }
+
+    getLabyrinthSegmentInfo(point, a, b) {
+        const abX = b.x - a.x;
+        const abY = b.y - a.y;
+        const abLenSq = abX * abX + abY * abY;
+        const t = abLenSq > 0
+            ? Math.max(0, Math.min(1, ((point.x - a.x) * abX + (point.y - a.y) * abY) / abLenSq))
+            : 0;
+        const projX = a.x + abX * t;
+        const projY = a.y + abY * t;
+        const dx = point.x - projX;
+        const dy = point.y - projY;
+        return {
+            t,
+            projX,
+            projY,
+            dist: Math.sqrt(dx * dx + dy * dy),
+            segLength: Math.sqrt(abLenSq)
+        };
+    }
+
+    buildLabyrinthGeometry(points) {
+        let totalLength = 0;
+        const cumulative = [0];
+        for (let i = 1; i < points.length; i++) {
+            totalLength += Math.sqrt((points[i].x - points[i - 1].x) ** 2 + (points[i].y - points[i - 1].y) ** 2);
+            cumulative.push(totalLength);
+        }
+        return { totalLength, cumulative };
+    }
+
+    getLabyrinthTimeLimit(level, totalLength) {
+        const playerCount = this.getRingPlayerCountForMode();
+        const cooperativeSpeedScale = playerCount === 1
+            ? 0.58
+            : playerCount === 2
+                ? 0.82
+                : 0.94;
+        const travelSpeed = this.getBasePlayerSpeedPerSecond() * cooperativeSpeedScale;
+        const baseTime = totalLength / Math.max(travelSpeed, 1);
+        const forgiveness = playerCount === 1
+            ? 1.34
+            : playerCount === 2
+                ? 1.22
+                : 1.18;
+        const flatBuffer = playerCount === 1
+            ? 2.9
+            : playerCount === 2
+                ? 2.3
+                : 2.1;
+        return Math.max(9, baseTime * forgiveness + level.difficulty * 1.0 + flatBuffer);
+    }
+
+    setupLabyrinthRun(level) {
+        const points = this.getScaledLabyrinthPath(level);
+        const geometry = this.buildLabyrinthGeometry(points);
+        const timeLimit = this.getLabyrinthTimeLimit(level, geometry.totalLength);
+        level.targetValue = timeLimit;
+        this.labyrinthRun = {
+            levelId: level.id,
+            points,
+            totalLength: geometry.totalLength,
+            cumulative: geometry.cumulative,
+            trackWidth: level.trackWidth,
+            timeLimit,
+            progress: 0,
+            nearestDistance: 0,
+            offTrackGrace: 0,
+            finishRadius: 36,
+            startPoint: points[0],
+            finishPoint: points[points.length - 1]
+        };
+
+        this.player.x = this.labyrinthRun.startPoint.x;
+        this.player.y = this.labyrinthRun.startPoint.y;
+    }
+
+    evaluateLabyrinthProgress(point) {
+        const run = this.labyrinthRun;
+        let best = { dist: Infinity, progress: 0 };
+        for (let i = 1; i < run.points.length; i++) {
+            const a = run.points[i - 1];
+            const b = run.points[i];
+            const info = this.getLabyrinthSegmentInfo(point, a, b);
+            if (info.dist < best.dist) {
+                const distanceAlong = run.cumulative[i - 1] + info.segLength * info.t;
+                best = {
+                    dist: info.dist,
+                    progress: run.totalLength > 0 ? distanceAlong / run.totalLength : 0
+                };
+            }
+        }
+        return best;
     }
 
     setupCollectibleObjective(lvl) {
@@ -677,7 +891,7 @@ class SchattenJaeger {
     }
 
     updatePlayingHud() {
-        const lvl = LEVELS[this.currentLevelIdx];
+        const lvl = this.getCurrentLevel();
         if (!lvl || this.state !== 'PLAYING') return;
 
         const hudLvl = document.getElementById('hud-level');
@@ -691,14 +905,30 @@ class SchattenJaeger {
         if (lvl.targetType === 'score') targetText = `${lvl.targetValue} Pkt`;
         else if (lvl.targetType === 'survival') targetText = `${lvl.targetValue}s überleben`;
         else if (lvl.targetType === 'pacifist') targetText = `${lvl.targetValue}s (max ${lvl.maxScore} Pkt)`;
+        else if (lvl.targetType === 'race') targetText = `${lvl.targetValue.toFixed(1)}s bis Ziel`;
         if (hudTarget) hudTarget.innerText = `Ziel: ${targetText}${this.getCollectibleStatusText()}`;
 
-        if (scoreHud) scoreHud.innerText = `Score: ${this.score}`;
+        if (scoreHud) {
+            if (lvl.targetType === 'race') {
+                const progress = this.labyrinthRun ? Math.floor(this.labyrinthRun.progress * 100) : 0;
+                scoreHud.innerText = `Fortschritt: ${progress}%`;
+            } else {
+                scoreHud.innerText = `Score: ${this.score}`;
+            }
+        }
         if (timerHud) {
             const mins = Math.floor(this.timer / 60);
             const secs = Math.floor(this.timer % 60);
             const tenths = Math.floor((this.timer * 10) % 10);
-            timerHud.innerText = `Zeit: ${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${tenths}`;
+            if (lvl.targetType === 'race') {
+                const remaining = Math.max(0, lvl.targetValue - this.timer);
+                const remMins = Math.floor(remaining / 60);
+                const remSecs = Math.floor(remaining % 60);
+                const remTenths = Math.floor((remaining * 10) % 10);
+                timerHud.innerText = `Rest: ${remMins.toString().padStart(2, '0')}:${remSecs.toString().padStart(2, '0')}.${remTenths}`;
+            } else {
+                timerHud.innerText = `Zeit: ${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${tenths}`;
+            }
         }
     }
 
@@ -796,25 +1026,47 @@ class SchattenJaeger {
         return objective.collected < objective.items.length;
     }
 
-    updateLevelSelect() {
-        const container = document.getElementById('level-select');
+    getSuggestedStartLevelForLevels(levels, bestStore) {
+        const completedIds = Object.keys(bestStore || {})
+            .map((id) => Number(id))
+            .filter((id) => Number.isInteger(id));
+        if (completedIds.length === 0) return levels[0].id;
+        return Math.min(Math.max(...completedIds) + 1, levels[levels.length - 1].id);
+    }
+
+    renderLevelSelect(containerId, levels, bestStore, modeForButtons) {
+        const container = document.getElementById(containerId);
         if (!container) return;
+
+        const suggestedStartLevel = this.getSuggestedStartLevelForLevels(levels, bestStore);
         container.innerHTML = '';
-        LEVELS.forEach(lvl => {
+        levels.forEach((lvl) => {
             const btn = document.createElement('button');
             btn.innerText = lvl.id;
-            const completed = this.saveData.bests[lvl.id] !== undefined;
+            const completed = bestStore[lvl.id] !== undefined;
             btn.className = `lvl-btn ${completed ? 'completed' : 'incomplete'}${lvl.id === suggestedStartLevel ? ' current-target' : ''}`;
-            const best = this.saveData.bests[lvl.id];
+            const best = bestStore[lvl.id];
             if (best !== undefined) {
                 const bestSpan = document.createElement('span');
                 bestSpan.className = 'best';
-                bestSpan.innerText = lvl.targetType === 'score' ? best : best.toFixed(1) + 's';
+                if (lvl.targetType === 'race') {
+                    bestSpan.innerText = `${best.toFixed(1)}s`;
+                } else {
+                    bestSpan.innerText = lvl.targetType === 'score' ? best : best.toFixed(1) + 's';
+                }
                 btn.appendChild(bestSpan);
             }
-            btn.onclick = () => this.startLevel(lvl.id);
+            btn.onclick = () => {
+                this.setMode(modeForButtons);
+                this.startLevel(lvl.id);
+            };
             container.appendChild(btn);
         });
+    }
+
+    updateLevelSelect() {
+        this.renderLevelSelect('level-select', LEVELS, this.saveData.bests, this.isLabyrinthMode() ? 'SOLO' : this.gameMode);
+        this.renderLevelSelect('labyrinth-level-select', LABYRINTH_LEVELS, this.saveData.labyrinthBests, this.isLabyrinthMode() ? this.gameMode : 'LABYRINTH_RING_SOLO');
     }
 
     showMenu() {
@@ -837,31 +1089,39 @@ class SchattenJaeger {
 
     startLevel(id) {
         this.initAudio();
-        const lvl = LEVELS.find(l => l.id === id);
-        this.currentLevelIdx = LEVELS.indexOf(lvl);
+        const levels = this.getLevelsForMode();
+        const lvl = levels.find(l => l.id === id);
+        if (!lvl) return;
+        this.currentLevelIdx = levels.indexOf(lvl);
         this.score = 0;
         this.timer = 0;
+        this.levelStartCountdown = this.isLabyrinthMode() ? 4 : 0;
         this.enemies = [];
         this.particles = [];
+        this.labyrinthRun = null;
         this.player.x = this.canvas.width / 2;
         this.player.y = this.canvas.height / 2 - 80;
         this.spawnTimer = 60;
         this.missionSplashTimer = 180; // 3 Sekunden für bessere Lesbarkeit
-        this.pillar.radius = lvl.pillarRadius;
-        this.pillar.baseRadius = lvl.pillarRadius;
+        this.pillar.radius = lvl.pillarRadius || 0;
+        this.pillar.baseRadius = lvl.pillarRadius || 0;
         this.pillar.angle = 0;
         this.isLightOn = true;
         this.setupCollectibleObjective(lvl);
-        this.updatePillarPos();
+        if (this.isLabyrinthMode()) {
+            this.setupLabyrinthRun(lvl);
+        } else {
+            this.updatePillarPos();
+        }
         if (this.isRingGameMode()) {
             this.ringForcePrototype.activePlayerCount = this.getRingPlayerCountForMode();
-            this.ringForcePrototype.radius = 88;
-            this.ringForcePrototype.thickness = 14;
+            this.ringForcePrototype.radius = this.isLabyrinthMode() ? 54 : 88;
+            this.ringForcePrototype.thickness = this.isLabyrinthMode() ? 12 : 14;
             this.ringForcePrototype.innerPadding = 1;
             this.resetRingForceBody();
             this.ringForcePrototype.position.x = this.player.x;
             this.ringForcePrototype.position.y = this.player.y;
-            const spawnLayout = this.getRingSpawnLayout(this.ringForcePrototype.activePlayerCount, 1);
+            const spawnLayout = this.getRingSpawnLayout(this.ringForcePrototype.activePlayerCount, this.isLabyrinthMode() ? 0.7 : 1);
             this.getActiveRingPlayers().forEach((player, idx) => {
                 player.worldPos.x = this.ringForcePrototype.position.x + spawnLayout[idx].x;
                 player.worldPos.y = this.ringForcePrototype.position.y + spawnLayout[idx].y;
@@ -874,21 +1134,24 @@ class SchattenJaeger {
         this.configureTouchControls();
     }
 
-    retry() { this.startLevel(LEVELS[this.currentLevelIdx].id); }
+    retry() { this.startLevel(this.getLevelsForMode()[this.currentLevelIdx].id); }
     nextLevel() {
-        const nextId = LEVELS[this.currentLevelIdx].id + 1;
-        if (nextId <= LEVELS.length) this.startLevel(nextId);
+        const levels = this.getLevelsForMode();
+        const nextId = levels[this.currentLevelIdx].id + 1;
+        if (nextId <= levels.length) this.startLevel(nextId);
         else this.showMenu();
     }
     canSkipLevel() {
-        return LEVELS[this.currentLevelIdx] && LEVELS[this.currentLevelIdx].id < this.getLastLevelId();
+        const levels = this.getLevelsForMode();
+        return levels[this.currentLevelIdx] && levels[this.currentLevelIdx].id < levels[levels.length - 1].id;
     }
     skipLevel() {
+        const levels = this.getLevelsForMode();
         if (!this.canSkipLevel()) {
             this.showMenu();
             return;
         }
-        this.startLevel(LEVELS[this.currentLevelIdx].id + 1);
+        this.startLevel(levels[this.currentLevelIdx].id + 1);
     }
 
     updateUI() {
@@ -1189,6 +1452,57 @@ class SchattenJaeger {
         this.player.y = ring.position.y;
     }
 
+    updateLabyrinth(dt) {
+        if (!this.labyrinthRun) return;
+
+        const lvl = this.getCurrentLevel();
+        if (this.levelStartCountdown > 0) {
+            this.levelStartCountdown = Math.max(0, this.levelStartCountdown - dt);
+            if (this.levelStartCountdown > 1) {
+                this.updatePlayingHud();
+                return;
+            }
+        }
+
+        this.timer += dt;
+        const prevX = this.ringForcePrototype.position.x;
+        const prevY = this.ringForcePrototype.position.y;
+        this.updateRingLevelMovement(dt);
+
+        const requiredPushers = this.getRingPlayerCountForMode() === 1 ? 1 : 2;
+        if (this.ringForcePrototype.activePushers < requiredPushers) {
+            this.ringForcePrototype.position.x = prevX + (this.ringForcePrototype.position.x - prevX) * 0.18;
+            this.ringForcePrototype.position.y = prevY + (this.ringForcePrototype.position.y - prevY) * 0.18;
+            this.player.x = this.ringForcePrototype.position.x;
+            this.player.y = this.ringForcePrototype.position.y;
+        }
+
+        const evaluation = this.evaluateLabyrinthProgress(this.ringForcePrototype.position);
+        this.labyrinthRun.progress = Math.max(this.labyrinthRun.progress, evaluation.progress);
+        this.labyrinthRun.nearestDistance = evaluation.dist;
+
+        const trackAllowance = (this.labyrinthRun.trackWidth / 2) - this.ringForcePrototype.radius - 6;
+        if (evaluation.dist > trackAllowance) {
+            this.lose('Vom Parkour gefallen.');
+            return;
+        }
+
+        const finishDx = this.ringForcePrototype.position.x - this.labyrinthRun.finishPoint.x;
+        const finishDy = this.ringForcePrototype.position.y - this.labyrinthRun.finishPoint.y;
+        const finishDist = Math.sqrt(finishDx * finishDx + finishDy * finishDy);
+        if (finishDist <= this.labyrinthRun.finishRadius && this.labyrinthRun.progress >= 0.97) {
+            this.win();
+            return;
+        }
+
+        if (this.timer >= lvl.targetValue) {
+            this.lose('Zeit abgelaufen.');
+            return;
+        }
+
+        this.updatePlayingHud();
+    }
+
     update(dt = 1 / 60) {
         if (this.state === 'RING_FORCE') {
             this.updateRingForce(dt);
@@ -1198,8 +1512,12 @@ class SchattenJaeger {
         if (this.state !== 'PLAYING') return;
         if (this.spawnTimer > 0) this.spawnTimer--;
         if (this.missionSplashTimer > 0) this.missionSplashTimer--;
+        if (this.isLabyrinthMode()) {
+            this.updateLabyrinth(dt);
+            return;
+        }
 
-        const lvl = LEVELS[this.currentLevelIdx];
+        const lvl = this.getCurrentLevel();
         this.timer += 1/60;
         const currentEnemySpeed = lvl.enemySpeedStart + (lvl.enemySpeedMax - lvl.enemySpeedStart) * Math.min(1, this.timer * lvl.acceleration);
         const currentSpawnRate = lvl.spawnRateStart - (lvl.spawnRateStart - lvl.spawnRateMax) * Math.min(1, this.timer * lvl.acceleration);
@@ -1392,12 +1710,23 @@ class SchattenJaeger {
         this.state = 'WIN'; this.playWinSound();
         this.configureTouchControls();
 
-        const lvl = LEVELS[this.currentLevelIdx];
-        const currentVal = lvl.targetType === 'score' ? this.score : this.timer;
-        const oldBest = this.saveData.bests[lvl.id];
+        const lvl = this.getCurrentLevel();
+        const bestStore = this.getBestStoreForMode();
+        const currentVal = lvl.targetType === 'score'
+            ? this.score
+            : lvl.targetType === 'race'
+                ? this.timer
+                : this.timer;
+        const oldBest = bestStore[lvl.id];
         let isNewBest = false;
-        if (oldBest === undefined || (lvl.targetType === 'score' && currentVal > oldBest) || (lvl.targetType !== 'score' && currentVal > oldBest)) {
-            this.saveData.bests[lvl.id] = currentVal; isNewBest = true;
+        if (
+            oldBest === undefined
+            || (lvl.targetType === 'score' && currentVal > oldBest)
+            || (lvl.targetType === 'race' && currentVal < oldBest)
+            || (lvl.targetType !== 'score' && lvl.targetType !== 'race' && currentVal > oldBest)
+        ) {
+            bestStore[lvl.id] = currentVal;
+            isNewBest = true;
         }
         const winBestMsg = document.getElementById('win-best-msg');
         if (winBestMsg) winBestMsg.innerText = isNewBest ? "NEUER REKORD!" : "";
@@ -1490,9 +1819,7 @@ class SchattenJaeger {
             .map((player) => `P${player.id} Schub ${player.pushStrength.toFixed(0)} Drag ${player.carryResistance.toFixed(0)}`)
             .join(' | ');
 
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.ctx.fillStyle = '#050505';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        this.drawBackground();
 
         this.ctx.save();
         this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
@@ -1603,20 +1930,192 @@ class SchattenJaeger {
         });
     }
 
+    drawLabyrinth() {
+        const lvl = this.getCurrentLevel();
+        const run = this.labyrinthRun;
+        if (!lvl || !run) return;
+
+        this.ctx.save();
+        this.drawBackground();
+
+        this.ctx.strokeStyle = '#1c1c1c';
+        this.ctx.lineCap = 'round';
+        this.ctx.lineJoin = 'round';
+        this.ctx.lineWidth = run.trackWidth + 28;
+        this.ctx.beginPath();
+        this.ctx.moveTo(run.points[0].x, run.points[0].y);
+        run.points.slice(1).forEach((pt) => this.ctx.lineTo(pt.x, pt.y));
+        this.ctx.stroke();
+
+        // Holzsteg-Textur
+        if (this.texWood.complete) {
+            const pattern = this.ctx.createPattern(this.texWood, 'repeat');
+            this.ctx.strokeStyle = pattern;
+        } else {
+            this.ctx.strokeStyle = '#4b4b4b';
+        }
+        
+        this.ctx.lineWidth = run.trackWidth;
+        this.ctx.beginPath();
+        this.ctx.moveTo(run.points[0].x, run.points[0].y);
+        run.points.slice(1).forEach((pt) => this.ctx.lineTo(pt.x, pt.y));
+        this.ctx.stroke();
+
+        // Verdunkelung der Textur
+        this.ctx.strokeStyle = 'rgba(0,0,0,0.6)'; // Stärkere Verdunkelung
+        this.ctx.lineWidth = run.trackWidth;
+        this.ctx.beginPath();
+        this.ctx.moveTo(run.points[0].x, run.points[0].y);
+        run.points.slice(1).forEach((pt) => this.ctx.lineTo(pt.x, pt.y));
+        this.ctx.stroke();
+
+        // Schattenkante für Tiefe auf dem Holz
+        this.ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+        this.ctx.lineWidth = run.trackWidth;
+        this.ctx.beginPath();
+        this.ctx.moveTo(run.points[0].x, run.points[0].y);
+        run.points.slice(1).forEach((pt) => this.ctx.lineTo(pt.x, pt.y));
+        this.ctx.stroke();
+
+        this.ctx.setLineDash([12, 14]);
+        this.ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        this.ctx.lineWidth = 3;
+        this.ctx.beginPath();
+        this.ctx.moveTo(run.points[0].x, run.points[0].y);
+        run.points.slice(1).forEach((pt) => this.ctx.lineTo(pt.x, pt.y));
+        this.ctx.stroke();
+        this.ctx.setLineDash([]);
+
+        this.ctx.fillStyle = '#44dd88';
+        this.ctx.beginPath();
+        this.ctx.arc(run.startPoint.x, run.startPoint.y, 18, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        this.ctx.fillStyle = '#ff6666';
+        this.ctx.beginPath();
+        this.ctx.arc(run.finishPoint.x, run.finishPoint.y, 20, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        this.drawRingForceInLevel();
+        this.ctx.fillStyle = '#fff';
+        this.ctx.shadowBlur = 18;
+        this.ctx.shadowColor = '#fff';
+        this.ctx.beginPath();
+        this.ctx.arc(this.ringForcePrototype.position.x, this.ringForcePrototype.position.y, this.player.radius, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.shadowBlur = 0;
+
+        this.ctx.fillStyle = '#fff';
+        this.ctx.textAlign = 'left';
+        this.ctx.font = 'bold 20px Segoe UI, sans-serif';
+        this.ctx.fillText(`Parkourbreite ${Math.round(run.trackWidth)} | Distanz ${run.totalLength.toFixed(0)}`, 24, this.canvas.height - 30);
+
+        if (this.missionSplashTimer > 0) {
+            let opacity = 1;
+            if (this.missionSplashTimer < 60) opacity = this.missionSplashTimer / 60;
+            this.ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+            this.ctx.textAlign = 'center';
+            this.ctx.font = 'bold 28px Segoe UI, sans-serif';
+            this.ctx.fillText(`PARKOUR IN ${lvl.targetValue.toFixed(1)} SEKUNDEN`, this.canvas.width / 2, this.canvas.height / 2 - 140);
+            this.ctx.font = '16px Segoe UI, sans-serif';
+            this.ctx.fillText(`${lvl.id}: ${lvl.name.toUpperCase()}`, this.canvas.width / 2, this.canvas.height / 2 - 176);
+        }
+
+        if (this.levelStartCountdown > 0) {
+            const phase = Math.ceil(this.levelStartCountdown) - 1;
+            const label = phase > 0 ? `${phase}` : 'LOS';
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
+            this.ctx.textAlign = 'center';
+            this.ctx.font = 'bold 72px Segoe UI, sans-serif';
+            this.ctx.fillText(label, this.canvas.width / 2, this.canvas.height / 2 + 24);
+            this.ctx.font = '18px Segoe UI, sans-serif';
+            this.ctx.fillText('Die Zeit startet erst bei LOS', this.canvas.width / 2, this.canvas.height / 2 + 62);
+        }
+        this.ctx.restore();
+    }
+
+    drawBackground() {
+        const { width, height } = this.canvas;
+        
+        // 1. Grundfarbe (etwas heller für mehr Sichtbarkeit)
+        this.ctx.fillStyle = '#0c0c0c';
+        this.ctx.fillRect(0, 0, width, height);
+
+        // 2. Hintergrundbild wählen
+        const isLab = this.isLabyrinthMode();
+        const img = isLab ? this.bgLabyrinth : this.bgClassic;
+
+        if (img && img.complete) {
+            this.ctx.globalAlpha = isLab ? 0.5 : 0.6; // Weiter aufgehellt (vorher 0.4/0.5)
+            const imgAspect = img.width / img.height;
+            const canvasAspect = width / height;
+            let drawW, drawH, drawX, drawY;
+
+            if (canvasAspect > imgAspect) {
+                drawW = width;
+                drawH = width / imgAspect;
+                drawX = 0;
+                drawY = (height - drawH) / 2;
+            } else {
+                drawH = height;
+                drawW = height * imgAspect;
+                drawX = (width - drawW) / 2;
+                drawY = 0;
+            }
+            this.ctx.drawImage(img, drawX, drawY, drawW, drawH);
+            this.ctx.globalAlpha = 1.0;
+        }
+
+        // 3. Gittermuster
+        this.ctx.strokeStyle = 'rgba(60, 60, 90, 0.15)';
+        this.ctx.lineWidth = 1;
+        const gridSize = 60;
+        
+        this.ctx.beginPath();
+        for (let x = 0; x <= width; x += gridSize) {
+            this.ctx.moveTo(x, 0);
+            this.ctx.lineTo(x, height);
+        }
+        for (let y = 0; y <= height; y += gridSize) {
+            this.ctx.moveTo(0, y);
+            this.ctx.lineTo(width, y);
+        }
+        this.ctx.stroke();
+
+        // 4. Vignette
+        const grad = this.ctx.createRadialGradient(width/2, height/2, 0, width/2, height/2, Math.max(width, height) * 0.8);
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.7)');
+        this.ctx.fillStyle = grad;
+        this.ctx.fillRect(0, 0, width, height);
+    }
+
     draw() {
         if (this.state === 'RING_FORCE') {
             this.drawRingForce();
             return;
         }
 
-        const lvl = LEVELS[this.currentLevelIdx];
+        if (this.state === 'PLAYING' && this.isLabyrinthMode()) {
+            this.drawLabyrinth();
+            return;
+        }
+
+        const lvl = this.getCurrentLevel();
 
         this.ctx.save();
         if (this.shake > 0.5) this.ctx.translate((Math.random()-0.5)*this.shake, (Math.random()-0.5)*this.shake);
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.ctx.fillStyle = '#050505'; this.ctx.fillRect(0,0,this.canvas.width, this.canvas.height);
+        
+        this.drawBackground();
+
         const poly = this.getShadowPoly();
-        if (poly) { this.ctx.fillStyle = 'rgba(35, 35, 35, 0.8)'; this.ctx.beginPath(); this.ctx.moveTo(poly[0].x, poly[0].y); poly.forEach(pt => this.ctx.lineTo(pt.x, pt.y)); this.ctx.fill(); }
+        if (poly) { 
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; // Viel dunklerer Schatten
+            this.ctx.beginPath(); 
+            this.ctx.moveTo(poly[0].x, poly[0].y); 
+            poly.forEach(pt => this.ctx.lineTo(pt.x, pt.y)); 
+            this.ctx.fill(); 
+        }
         this.ctx.fillStyle = '#111'; this.ctx.beginPath(); this.ctx.arc(this.pillar.x, this.pillar.y, this.pillar.radius, 0, Math.PI*2); this.ctx.fill(); this.ctx.strokeStyle = '#333'; this.ctx.stroke();
         
         this.particles.forEach(p => { 
@@ -1643,14 +2142,14 @@ class SchattenJaeger {
         });
         if (this.isLightOn) {
             if (this.gameMode === 'SOLO' || this.isRingGameMode()) {
-                const grad = this.ctx.createRadialGradient(this.player.x, this.player.y, 0, this.player.x, this.player.y, 350);
-                grad.addColorStop(0, 'rgba(255,255,255,0.15)'); grad.addColorStop(1, 'transparent');
+                const grad = this.ctx.createRadialGradient(this.player.x, this.player.y, 0, this.player.x, this.player.y, 450);
+                grad.addColorStop(0, 'rgba(255,255,255,0.25)'); grad.addColorStop(1, 'transparent');
                 this.ctx.fillStyle = grad; this.ctx.fillRect(0,0,this.canvas.width, this.canvas.height);
             } else {
                 this.ctx.save(); this.ctx.translate(this.player.x, this.player.y); this.ctx.rotate(this.lightAngle);
-                const grad = this.ctx.createRadialGradient(0, 0, 0, 0, 0, 500);
-                grad.addColorStop(0, 'rgba(255,255,255,0.25)'); grad.addColorStop(1, 'transparent');
-                this.ctx.fillStyle = grad; this.ctx.beginPath(); this.ctx.moveTo(0,0); this.ctx.arc(0,0, 500, -this.lightSpread/2, this.lightSpread/2); this.ctx.closePath(); this.ctx.fill(); this.ctx.restore();
+                const grad = this.ctx.createRadialGradient(0, 0, 0, 0, 0, 600);
+                grad.addColorStop(0, 'rgba(255,255,255,0.35)'); grad.addColorStop(1, 'transparent');
+                this.ctx.fillStyle = grad; this.ctx.beginPath(); this.ctx.moveTo(0,0); this.ctx.arc(0,0, 600, -this.lightSpread/2, this.lightSpread/2); this.ctx.closePath(); this.ctx.fill(); this.ctx.restore();
             }
         }
         this.ctx.fillStyle = '#fff'; this.ctx.shadowBlur = 20; this.ctx.shadowColor = '#fff'; this.ctx.beginPath(); this.ctx.arc(this.player.x, this.player.y, this.player.radius, 0, Math.PI*2); this.ctx.fill(); this.ctx.shadowBlur = 0;
@@ -1696,6 +2195,7 @@ class SchattenJaeger {
             if (lvl.targetType === 'score') targetText = `ZIEL: ${lvl.targetValue} PUNKTE`;
             else if (lvl.targetType === 'survival') targetText = `ÜBERLEBE ${lvl.targetValue} SEKUNDEN`;
             else if (lvl.targetType === 'pacifist') targetText = `PAZIFIST: ${lvl.targetValue}s (MAX ${lvl.maxScore} PKT)`;
+            else if (lvl.targetType === 'race') targetText = `PARKOUR IN ${lvl.targetValue.toFixed(1)} SEKUNDEN`;
             
             this.ctx.fillText(targetText, this.canvas.width / 2, this.canvas.height / 2 - 150);
             if (lvl.collectHearts) {

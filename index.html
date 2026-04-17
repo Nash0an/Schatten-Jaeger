@@ -89,28 +89,27 @@
                     <h3 class="title-sub mode-group-title">RINGS</h3>
                     <div class="mode-group">
                         <div class="mode-selection">
-                            <button class="mode-card mode-card-placeholder" type="button" disabled>
+                            <button id="mode-lab-solo" class="mode-card" type="button" onclick="game.setMode('LABYRINTH_RING_SOLO')">
                                 <h3 class="margin-v-10">SOLO</h3>
                                 <p class="controls-hint">Neuer Levelsatz fuer 1 Spieler</p>
                             </button>
-                            <button class="mode-card mode-card-placeholder" type="button" disabled>
+                            <button id="mode-lab-duo" class="mode-card" type="button" onclick="game.setMode('LABYRINTH_RING_DUO')">
                                 <h3 class="margin-v-10">KOOP</h3>
                                 <p class="controls-hint">Neuer Levelsatz fuer 2 Spieler</p>
                             </button>
-                            <button class="mode-card mode-card-placeholder" type="button" disabled>
+                            <button id="mode-lab-trio" class="mode-card" type="button" onclick="game.setMode('LABYRINTH_RING_TRIO')">
                                 <h3 class="margin-v-10">TRIO</h3>
                                 <p class="controls-hint">Neuer Levelsatz fuer 3 Spieler</p>
                             </button>
                         </div>
                     </div>
 
-                    <button class="btn-secondary" type="button" disabled>LABYRINTH STARTET BALD</button>
+                    <button class="btn-secondary" type="button" disabled>LABYRINTH PARKOUR</button>
                     <button class="btn-secondary" type="button" disabled>RING-FORCE PROTOTYP</button>
                     <p class="text-hint margin-v-10">Physik-Sandbox: mit `1/2/3` zwischen einem, zwei und drei Spielern im Ring umschalten. Nur Druck gegen die Innenwand verschiebt den Ring.</p>
-                    <button class="btn-audio" type="button" onclick="game.initAudio()">Audio aktivieren</button>
                     
                     <h3 class="title-sub">Levelauswahl</h3>
-                    <div class="level-select-placeholder"></div>
+                    <div id="labyrinth-level-select"></div>
                     <button class="btn-reset-progress" type="button" onclick="game.resetProgress()">Fortschritt zurücksetzen</button>
                 </div>
             </div>

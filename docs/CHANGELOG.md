@@ -2,13 +2,35 @@
 
 Alle relevanten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [2.6.0] - 2026-04-17
+### Hinzugefügt
+- **Dynamisches Hintergrund-System:** Unterstützung für modus-spezifische Hintergründe (Schattenjäger vs. Labyrinth).
+- **Asset-Management:** Einführung einer professionellen Verzeichnisstruktur unter `assets/images/`.
+- **Visuelle Effekte:** Prozedurales Gitter (Grid) und Vignette-Effekt für mehr Tiefe und Atmosphäre.
+- **Labyrinth-Texturen:** Implementierung einer dunklen Holzsteg-Textur für den Parkour-Pfad.
+
+### Geändert
+- **Labyrinth-Engine:** Pfade sind nun 50% breiter und deutlich geschwungener/organischer generiert.
+- **Beleuchtungs-Tuning:** Lampe vergrößert (Radius 450-600) und intensiviert; Spielfeld insgesamt aufgehellt.
+- **Schatten-Design:** Schatten-Polygone sind massiver und dunkler für besseren Kontrast.
+- **UI-Verbesserungen:** 
+    - Menü-Umschaltbuttons (Schattenjäger/Labyrinth) sind nun exakt zentriert.
+    - Menü-Panels haben eine konsistente Breite von 700px für stabilere Layouts auf dem Desktop.
+    - Das Hauptmenü zeigt nun live den Hintergrund des jeweiligen Modus an.
+
+### Bereinigt
+- Redundanter Audio-Aktivierungsbutton im Labyrinth-Menü entfernt.
+
 ## [2.5.3] - 2026-04-17
 ### Hinzugefügt
 - Separater `Ring-Force`-Physikprototyp im Menü, in dem zwei Spieler sich frei im Ringinneren bewegen.
 - Der Ring verschiebt sich nur durch aktiven Druck gegen seine Innenwand; ohne Druck bleibt er sofort stehen.
 - Neue Spielmodi `RING SOLO`, `RING DUO` und `RING TRIO` in den normalen Leveln.
+- Neue Spielmodi `LABYRINTH_RING_SOLO`, `LABYRINTH_RING_DUO` und `LABYRINTH_RING_TRIO`.
 - Die Sandbox kann jetzt zwischen einem, zwei und drei Spielern umschalten.
 - Spätere Level können jetzt verzögerte Kirsch-Sammelziele aktivieren, die früh im Spielfeld erscheinen.
+- Labyrinth besitzt jetzt einen eigenen 50-Level-Parkoursatz mit Zeitlimit, Absturzlogik und Zielerreichung.
+- Neue Übergabedokumentation `docs/DEV_HANDOFF.md` für schnellen Wiedereinstieg und Entwicklerübergabe.
 
 ### Geändert
 - Stillstehende Spieler bleiben bei Ringbewegung zunächst in Weltkoordinaten stehen und werden erst von der nachrückenden Innenwand mitgenommen.
@@ -17,6 +39,9 @@ Alle relevanten Änderungen an diesem Projekt werden hier dokumentiert.
 - Nach einer Niederlage kann das aktuelle Level jetzt direkt übersprungen werden.
 - Ein Level endet nun in diesen markierten Stufen erst, wenn sowohl das Hauptziel als auch alle erschienenen Kirschen erfüllt sind.
 - Das Startmenü trennt jetzt zwischen `Schattenjäger` und `Labyrinth` auf zwei Menübildschirmen mit Umschaltbutton.
+- Das Labyrinth-Menü nutzt jetzt echte Moduskarten und eine eigene Levelauswahl.
+- Labyrinth nutzt jetzt einen Start-Countdown `3, 2, 1, LOS`; Bewegung und Timer beginnen bei `LOS`.
+- Die Labyrinth-Solo-Zeitfenster wurden leicht gelockert.
 - Architektur-, Status-, Roadmap- und Einstiegsdokumente wurden auf den aktuellen Stand vor dem `Labyrinth`-Ausbau gebracht.
 
 ## [2.5.2] - 2026-04-15

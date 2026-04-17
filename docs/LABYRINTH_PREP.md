@@ -1,78 +1,57 @@
 # Labyrinth Prep
 
-Diese Datei hält den sauberen Übergabestand fest, bevor die eigentliche `Labyrinth`-Programmierung beginnt.
+Diese Datei hält den Stand direkt nach der ersten spielbaren Labyrinth-Implementierung fest und dient als Arbeitsgrundlage für das nächste Balancing.
 
-## 1. Was schon vorhanden ist
-- Das Menü hat bereits einen eigenen `Labyrinth`-Bildschirm.
-- Der Wechsel zwischen `SCHATTEN-JÄGER` und `LABYRINTH` funktioniert über die runden Buttons rechts oben.
-- Der `Labyrinth`-Bildschirm nutzt bewusst fast denselben Rahmen wie das Hauptmenü.
-- Im `Labyrinth`-Bildschirm ist die obere klassische `SOLO`/`KOOP`-Zeile entfernt.
-- Darunter existiert bereits die Gruppe `RINGS` mit Platzhalterkarten für:
+## Was schon steht
+- eigener Labyrinth-Menübildschirm
+- echte Moduskarten für:
   - `SOLO`
   - `KOOP`
   - `TRIO`
-- Eine Platzhalter-Levelauswahl ist optisch angelegt, aber noch nicht funktional.
+- eigene Labyrinth-Levelauswahl
+- eigener Levelsatz `LABYRINTH_LEVELS`
+- 50 generierte Parkourlevels
+- Zeitlimit pro Level
+- Start-Countdown `3, 2, 1, LOS`
+- Absturz beim Verlassen des Kurses
+- Zielerreichung am Finishpunkt
+- getrennte Labyrinth-Bestzeiten
 
-## 2. Was noch **nicht** existiert
-- Keine `LABYRINTH_*`-Spielmodi im Code.
-- Kein eigener Labyrinth-Levelsatz.
-- Keine getrennte Progression für Labyrinth.
-- Keine Labyrinth-spezifische Spielmechanik.
-- Keine anklickbaren Labyrinth-Moduskarten.
+## Technischer Einstiegspunkt
+- Leveldaten: `levels.js`
+- Menü/Levelauswahl: `index.html`, `styles.css`, `updateLevelSelect()`
+- Labyrinth-Setup: `setupLabyrinthRun()`
+- Labyrinth-Update: `updateLabyrinth()`
+- Labyrinth-Render: `drawLabyrinth()`
 
-## 3. Wahrscheinlich sinnvoller nächster Implementierungspfad
+## Wichtigste offene Aufgabe
+Balancing.
 
-### Schritt 1: Moduszustände anlegen
-Neue Modi einführen, z. B.:
-- `LABYRINTH_RING_SOLO`
-- `LABYRINTH_RING_DUO`
-- `LABYRINTH_RING_TRIO`
+Das betrifft vor allem:
+- Trackbreiten
+- Kurvenhärte
+- Zeitlimits
+- Koop-Zwang in `DUO` und `TRIO`
+- Startgefühl und Countdown-Übergang
 
-Empfehlung:
-- Die Benennung sollte sofort klar trennen zwischen
-  - klassischem Hauptspiel,
-  - Ring-Hauptspiel,
-  - Labyrinth-Ringspiel.
+## Aktuelle Annahme
+Die Zeitfenster in `DUO` und `TRIO` sind auf Kooperation gerechnet. Ein einzelner Spieler soll diese Modi im Regelfall nicht sinnvoll schaffen.
 
-### Schritt 2: Eigenen Levelsatz aufbauen
-Nicht in `LEVELS` hineinmischen, sondern sauber trennen:
-- entweder `LABYRINTH_LEVELS` in `levels.js`,
-- oder später separate Datei.
+Im `SOLO` wurde das Zeitfenster zuletzt leicht gelockert. Das muss jetzt im echten Test überprüft werden, nicht mehr nur rechnerisch.
 
-### Schritt 3: Eigene Levelauswahl anbinden
-Die aktuelle Platzhalterfläche im Labyrinth-Menü sollte später:
-- echte Buttons erzeugen,
-- nur Labyrinth-Level anzeigen,
-- eigene Bestzeiten/-werte lesen.
+Außerdem gilt aktuell:
+- `3`, `2`, `1` blockieren Bewegung.
+- Sobald `LOS` sichtbar ist, darf der Ring losfahren.
+- Die Zeit startet ebenfalls erst bei `LOS`.
 
-### Schritt 4: Progression entscheiden
-Noch offen ist, ob Labyrinth:
-- dieselbe Save-Struktur teilt,
-- oder einen eigenen Fortschrittspfad bekommt.
+## Nächste sinnvolle Reihenfolge
+1. Labyrinth Level 1, 10, 20, 30, 40, 50 testen.
+2. Solo-Zeiten weiter feinziehen, bis man kleine Fehler machen darf, aber nicht trödelt.
+3. Danach Duo-/Trio-Zeiten testen und den Koop-Zwang prüfen.
+4. Zu harte oder langweilige generierte Kurse ersetzen.
+5. Danach Spezialelemente oder optisches Polish hinzufügen.
 
-Empfehlung:
-- getrennte Save-Keys innerhalb von `sj_v2_data`, damit das Hauptspiel stabil bleibt.
-
-## 4. Technische Ankerstellen im Code
-- Menüumschaltung: `setMenuTab()` in `game.js`
-- Menü-Layout: `index.html`, `styles.css`
-- Modusumschaltung Hauptspiel: `setMode()`
-- Levelstart: `startLevel()`
-- HUD/Menu Refresh: `updateUI()`, `updateLevelSelect()`
-
-## 5. Wichtige Designentscheidung
-Das Hauptspiel und `Labyrinth` sollten jetzt bewusst **nicht** vermischt werden.
-
-Sauberer Weg:
-- Hauptspiel bleibt stabil.
-- Labyrinth bekommt eigene Modi.
-- Labyrinth bekommt eigenen Levelsatz.
-- Erst danach wird spezifische Labyrinth-Physik oder Wegelogik ergänzt.
-
-## 6. Empfohlener Start für die nächste Session
-Wenn die Labyrinth-Implementierung beginnt, dann in dieser Reihenfolge:
-1. `LABYRINTH_*`-Modi im Code anlegen.
-2. Platzhalterkarten klickbar machen.
-3. Eigenen Labyrinth-Levelsatz aufsetzen.
-4. Separate Labyrinth-Levelauswahl rendern.
-5. Erst danach die eigentliche Labyrinth-Mechanik programmieren.
+## Nicht als Nächstes tun
+- Nicht zuerst neue Labyrinth-Sonderobjekte bauen.
+- Nicht zuerst das klassische Spiel umbauen.
+- Nicht zuerst Touch für Trio lösen, solange die Kernbalance im Browser noch nicht steht.

@@ -1,46 +1,45 @@
 # Quick Context
 
-Diese Datei ist die Kurznotiz für den nächsten sauberen Einstieg ins Projekt.
-
 ## Projekt in einem Satz
-`Schatten-Jäger` ist aktuell ein browserbasiertes Canvas-Spiel mit klassischem Hauptspiel, integrierten Ring-Modi und einem vorbereiteten, aber noch nicht implementierten zweiten Spielzweig `Labyrinth`.
+`Schatten-Jäger` ist aktuell ein Canvas-Spiel mit klassischem Hauptspiel, Ring-Modi und einem ersten spielbaren Labyrinth-Parkourzweig.
 
-## Was gerade wichtig ist
-- Hauptspiel ist stabil und soll nicht unnötig umgebaut werden.
-- Ring-Modi (`RING_SOLO`, `RING_DUO`, `RING_TRIO`) laufen bereits in normalen Levels.
-- Das Menü ist für `Labyrinth` vorbereitet, aber `Labyrinth` ist noch reine Platzhalter-UI.
-- Alle Hauptlevel sind direkt anwählbar; es gibt keinen zentralen Startbutton mehr.
+## Gerade wichtig
+- Klassisches Hauptspiel soll stabil bleiben.
+- Labyrinth ist jetzt nicht mehr nur Menü, sondern bereits spielbar.
+- Der nächste Schritt ist Balancing, nicht mehr Grundarchitektur.
+- Für die Arbeitsaufnahme nach einer Pause ist `docs/DEV_HANDOFF.md` die wichtigste Datei.
 
 ## Was zuletzt eingebaut wurde
-- Ring-Mechanik mit 1/2/3 Spielern.
-- Ring-Force-Sandbox.
-- Zusatzziele mit früh spawnenden Kirschen in ausgewählten späten Levels.
-- Menü-Umbau auf zwei Bildschirme:
-  - `SCHATTEN-JÄGER`
-  - `LABYRINTH`
+- Labyrinth-Modi:
+  - `LABYRINTH_RING_SOLO`
+  - `LABYRINTH_RING_DUO`
+  - `LABYRINTH_RING_TRIO`
+- Eigene Labyrinth-Levelauswahl
+- 50 generierte Labyrinth-Level
+- Parkour-Update-/Render-Logik
+- Getrennte Labyrinth-Bestzeiten
+- Start-Countdown `3, 2, 1, LOS`, wobei Bewegung und Zeit bei `LOS` beginnen
 
-## Wo man im Code zuerst schaut
-- Menü/Umschaltung: `setMenuTab()`, `setMode()`, `updateUI()`
-- Levelauswahl/Progression: `updateLevelSelect()`, `startLevel()`, `skipLevel()`
-- Hauptgameplay: `update()`, `draw()`, `getShadowPoly()`
-- Ring-Gameplay: `setupRingForcePrototype()`, `updateRingForce()`, `updateRingLevelMovement()`
-- Sammelziele: `setupCollectibleObjective()`, `updateCollectibleObjective()`
+## Wo man zuerst schaut
+- Menü/Modi: `setMode()`, `setMenuTab()`, `refreshModeSelection()`
+- Levelauswahl: `updateLevelSelect()`, `renderLevelSelect()`
+- Labyrinth-Setup: `setupLabyrinthRun()`
+- Labyrinth-Loop: `updateLabyrinth()`
+- Labyrinth-Render: `drawLabyrinth()`
+- Ring-Physik: `updateRingForce()`
 
-## Wichtig für die nächste große Aufgabe
-Wenn `Labyrinth` beginnt:
-- nicht in die bestehenden Hauptmodi hineinpfuschen,
-- neue `LABYRINTH_*`-Modi anlegen,
-- eigenen Levelsatz verwenden,
-- eigene Levelauswahl aufbauen.
+## Nächster sinnvoller Arbeitsschritt
+- Labyrinth-Level im Browser testen
+- zuerst Zeitlimits für `SOLO` feinziehen
+- danach `DUO` und `TRIO` prüfen
+- harte oder schlechte Kurse ersetzen
 
-Details dazu stehen in:
-- [docs/LABYRINTH_PREP.md](docs/LABYRINTH_PREP.md)
+## Wenn du morgen neu einsteigst
+1. `docs/DEV_HANDOFF.md` lesen
+2. `docs/LABYRINTH_PREP.md` lesen
+3. dann erst `game.js` und `levels.js` öffnen
 
-## Wichtige Zustände und Daten
-- `sj_v2_data` in `localStorage`: echter Spielfortschritt
-- `masterModeActive`: nur temporärer Sitzungsstatus
-- `RING_FORCE`: separater Sandbox-Zustand
-
-## Cheats
-- `angimylove`: Meister-Modus an
-- `exit`: Meister-Modus aus
+## Wichtige Save-Daten
+- `saveData.bests`: klassisches Hauptspiel
+- `saveData.labyrinthBests`: Labyrinth
+- `masterModeActive`: nur temporär

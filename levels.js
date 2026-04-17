@@ -72,3 +72,54 @@ LEVELS.forEach((lvl) => {
         delay: heartConfig.delay
     };
 });
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+function createLabyrinthPath(levelId) {
+    const difficulty = (levelId - 1) / 49;
+    const segments = 12 + Math.floor(levelId / 1.5); // Mehr Segmente für mehr Schwung
+    const points = [{ x: 0.08, y: 0.5 }];
+
+    for (let i = 1; i < segments; i++) {
+        const progress = i / segments;
+        const x = 0.08 + progress * 0.84;
+        
+        // Viel größere Schwünge über den ganzen Bildschirm
+        const mainWave = Math.sin(progress * Math.PI * (2 + difficulty * 2.5)) * 0.35;
+        const secondaryWave = Math.cos(progress * Math.PI * 4.2) * (0.05 + difficulty * 0.1);
+        
+        const y = clamp(0.5 + mainWave + secondaryWave, 0.12, 0.88);
+        points.push({ x, y });
+    }
+
+    points.push({ x: 0.94, y: clamp(0.5 + Math.sin(levelId * 0.4) * 0.2, 0.15, 0.85) });
+    return points;
+}
+
+const LABYRINTH_LEVELS = Array.from({ length: 50 }, (_, idx) => {
+    const id = idx + 1;
+    const difficulty = idx / 49;
+    const names = [
+        'Anlauf', 'Erste Kurve', 'Doppelschub', 'Kantenspiel', 'Schlanke Linie',
+        'Wellenritt', 'Gegenbogen', 'Schulterblick', 'Bruchkante', 'Vorhof',
+        'Schieberaum', 'Windung', 'Ziehharmonika', 'Faltwerk', 'Stufenlauf',
+        'Kreuzbogen', 'Stachelpfad', 'S-Kammer', 'Engstelle', 'Kippbahn',
+        'Zickzack I', 'Zickzack II', 'Zickzack III', 'Druckspur', 'Sichelweg',
+        'Rippenpfad', 'Klammergriff', 'Hakenlinie', 'Nadelgang', 'Schattenfalz',
+        'Drehschacht', 'Dornbogen', 'Kreiselspur', 'Spannwerk', 'Wirbelgang',
+        'Fugenlauf', 'Sturmkante', 'Schachtelpfad', 'Scharte', 'Schlangenwerk',
+        'Zackenring', 'Kippkante', 'Bruchspur', 'Rissbogen', 'Dornkanal',
+        'Drucknadel', 'Splitterwerk', 'Stachelkreis', 'Endfalz', 'Labyrinth-Krone'
+    ];
+    return {
+        id,
+        name: names[idx],
+        targetType: 'race',
+        targetValue: 0,
+        difficulty,
+        trackWidth: Math.round((196 - difficulty * 56) * 1.5),
+        path: createLabyrinthPath(id)
+    };
+});
