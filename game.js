@@ -622,6 +622,118 @@ class SchattenJaeger {
         osc.start(); osc.stop(this.audioCtx.currentTime + 0.5);
     }
 
+    startFireSound() {
+        if (!this.audioCtx || this.fireAudioNodes) return;
+        const ctx = this.audioCtx;
+        const master = ctx.createGain();
+        master.gain.setValueAtTime(0, ctx.currentTime);
+        master.gain.linearRampToValueAtTime(0.18, ctx.currentTime + 1.5);
+        master.connect(ctx.destination);
+
+        // Feuer-Rauschen: weißes Rauschen durch Bandpass
+        const bufSize = ctx.sampleRate * 4;
+        const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+        const noise = ctx.createBufferSource();
+        noise.buffer = buf;
+        noise.loop = true;
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = 600;
+        bp.Q.value = 0.6;
+        noise.connect(bp);
+        bp.connect(master);
+        noise.start();
+
+        // Tiefes Knistern
+        const crackle = ctx.createOscillator();
+        crackle.type = 'sawtooth';
+        crackle.frequency.value = 42;
+        const crackleGain = ctx.createGain();
+        crackleGain.gain.value = 0.06;
+        crackle.connect(crackleGain);
+        crackleGain.connect(master);
+        crackle.start();
+
+        // Spannungs-Drone: tiefer Sinuston der langsam ansteigt
+        const drone = ctx.createOscillator();
+        drone.type = 'sine';
+        drone.frequency.setValueAtTime(55, ctx.currentTime);
+        drone.frequency.linearRampToValueAtTime(110, ctx.currentTime + 30);
+        const droneGain = ctx.createGain();
+        droneGain.gain.value = 0.09;
+        drone.connect(droneGain);
+        droneGain.connect(master);
+        drone.start();
+
+        this.fireAudioNodes = { master, noise, crackle, drone, bp, crackleGain, droneGain };
+    }
+
+    updateFireSoundIntensity(dangerProg) {
+        if (!this.fireAudioNodes || !this.audioCtx) return;
+        const ctx = this.audioCtx;
+        const t = ctx.currentTime;
+        const intensity = Math.min(1, dangerProg * 1.5);
+        const nodes = this.fireAudioNodes;
+        nodes.master.gain.linearRampToValueAtTime(0.12 + intensity * 0.16, t + 0.1);
+        nodes.bp.frequency.linearRampToValueAtTime(400 + intensity * 800, t + 0.1);
+        nodes.droneGain.gain.linearRampToValueAtTime(0.06 + intensity * 0.1, t + 0.1);
+    }
+
+    stopFireSound() {
+        if (!this.fireAudioNodes || !this.audioCtx) return;
+        const ctx = this.audioCtx;
+        const nodes = this.fireAudioNodes;
+        nodes.master.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3);
+        setTimeout(() => {
+            try { nodes.noise.stop(); } catch(e) {}
+            try { nodes.crackle.stop(); } catch(e) {}
+            try { nodes.drone.stop(); } catch(e) {}
+        }, 400);
+        this.fireAudioNodes = null;
+    }
+
+    playStartHorn() {
+        if (!this.audioCtx) return;
+        const ctx = this.audioCtx;
+        const now = ctx.currentTime;
+
+        // Zwei Töne: kurzer Auftakt + längerer Hauptton (Quinte hoch)
+        const notes = [
+            { freq: 440, start: 0, dur: 0.12, vol: 0.13 },
+            { freq: 660, start: 0.13, dur: 0.35, vol: 0.16 },
+        ];
+
+        notes.forEach(n => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(n.freq, now + n.start);
+            gain.gain.setValueAtTime(0, now + n.start);
+            gain.gain.linearRampToValueAtTime(n.vol, now + n.start + 0.02);
+            gain.gain.setValueAtTime(n.vol, now + n.start + n.dur * 0.6);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + n.start + n.dur);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + n.start);
+            osc.stop(now + n.start + n.dur);
+        });
+
+        // Oberton für Schärfe
+        const overtone = ctx.createOscillator();
+        const oGain = ctx.createGain();
+        overtone.type = 'sine';
+        overtone.frequency.value = 1320;
+        oGain.gain.setValueAtTime(0, now + 0.13);
+        oGain.gain.linearRampToValueAtTime(0.06, now + 0.16);
+        oGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+        overtone.connect(oGain);
+        oGain.connect(ctx.destination);
+        overtone.start(now + 0.13);
+        overtone.stop(now + 0.48);
+    }
+
     setMode(mode) {
         this.gameMode = mode;
         const targetTab = this.isLabyrinthMode() ? 'LABYRINTH' : 'CLASSIC';
@@ -1008,6 +1120,7 @@ class SchattenJaeger {
             startPoint: points[0],
             finishPoint: points[points.length - 1]
         };
+        this.fireParticles = [];
 
         this.player.x = this.labyrinthRun.startPoint.x;
         this.player.y = this.labyrinthRun.startPoint.y;
@@ -1029,6 +1142,27 @@ class SchattenJaeger {
             }
         }
         return best;
+    }
+
+    // Gibt die Weltposition zurück, bis zu der der Steg "abgebrannt" sein soll.
+    // dangerProgress = 0..1 (this.timer / lvl.targetValue)
+    getDangerPoint(dangerProgress) {
+        const run = this.labyrinthRun;
+        if (!run) return null;
+        const clampedProg = Math.min(1, Math.max(0, dangerProgress));
+        const dangerDist = clampedProg * run.totalLength;
+        for (let i = 1; i < run.points.length; i++) {
+            if (run.cumulative[i] >= dangerDist || i === run.points.length - 1) {
+                const span = run.cumulative[i] - run.cumulative[i - 1];
+                const t = span > 0 ? Math.min(1, (dangerDist - run.cumulative[i - 1]) / span) : 0;
+                return {
+                    x: run.points[i - 1].x + (run.points[i].x - run.points[i - 1].x) * t,
+                    y: run.points[i - 1].y + (run.points[i].y - run.points[i - 1].y) * t,
+                    segIdx: i
+                };
+            }
+        }
+        return { ...run.points[run.points.length - 1], segIdx: run.points.length - 1 };
     }
 
     setupCollectibleObjective(lvl) {
@@ -1096,7 +1230,14 @@ class SchattenJaeger {
                 const remSecs = Math.floor(remaining % 60);
                 const remTenths = Math.floor((remaining * 10) % 10);
                 timerHud.innerText = `Rest: ${remMins.toString().padStart(2, '0')}:${remSecs.toString().padStart(2, '0')}.${remTenths}`;
+                // Farbe: grün = voraus, orange = knapp, rot = zu langsam
+                const fhs = 3;
+                const dangerProg = this.timer <= fhs ? 0
+                    : Math.min(1, (this.timer - fhs) / (lvl.targetValue - fhs));
+                const diff = (this.labyrinthRun ? this.labyrinthRun.progress : 0) - dangerProg;
+                timerHud.style.color = diff > 0.05 ? '#44dd88' : diff > 0 ? '#ffcc44' : '#ff4444';
             } else {
+                timerHud.style.color = '';
                 timerHud.innerText = `Zeit: ${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${tenths}`;
             }
         }
@@ -1241,6 +1382,7 @@ class SchattenJaeger {
 
     showMenu() {
         this.state = 'MENU';
+        this.stopFireSound();
         this.updateUI();
         this.updateLevelSelect();
         this.configureTouchControls();
@@ -1269,6 +1411,9 @@ class SchattenJaeger {
         this.enemies = [];
         this.particles = [];
         this.labyrinthRun = null;
+        this.fireParticles = [];
+        this.stopFireSound();
+        this.fireAudioNodes = null;
         this.player.x = this.canvas.width / 2;
         this.player.y = this.canvas.height / 2 - 80;
         this.spawnTimer = 60;
@@ -1636,7 +1781,11 @@ class SchattenJaeger {
 
         const lvl = this.getCurrentLevel();
         if (this.levelStartCountdown > 0) {
+            const prevCountdown = this.levelStartCountdown;
             this.levelStartCountdown = Math.max(0, this.levelStartCountdown - dt);
+            if (prevCountdown > 1 && this.levelStartCountdown <= 1) {
+                this.playStartHorn();
+            }
             if (this.levelStartCountdown > 1) {
                 this.updatePlayingHud();
                 return;
@@ -1660,10 +1809,62 @@ class SchattenJaeger {
         this.labyrinthRun.progress = Math.max(this.labyrinthRun.progress, evaluation.progress);
         this.labyrinthRun.nearestDistance = evaluation.dist;
 
+        // Feuer-Partikel spawnen an der Gefahrenlinie (3s Vorsprung)
+        const fireHeadStart = 3;
+        const dangerProg = this.timer <= fireHeadStart ? 0
+            : Math.min(1, (this.timer - fireHeadStart) / (lvl.targetValue - fireHeadStart));
+        const dp = this.getDangerPoint(dangerProg);
+
+        // Feuer-Sound starten/updaten
+        if (dangerProg > 0.005 && !this.fireAudioNodes) {
+            this.startFireSound();
+        }
+        if (this.fireAudioNodes) {
+            this.updateFireSoundIntensity(dangerProg);
+        }
+
+        if (dp && dangerProg > 0.005) {
+            const spread = this.labyrinthRun.trackWidth * 0.38;
+            for (let k = 0; k < 5; k++) {
+                this.fireParticles.push({
+                    x: dp.x + (Math.random() - 0.5) * spread,
+                    y: dp.y + (Math.random() - 0.5) * spread,
+                    vx: (Math.random() - 0.5) * 28,
+                    vy: -(Math.random() * 90 + 50),
+                    life: 1, maxLife: 1,
+                    size: 7 + Math.random() * 14,
+                    hue: Math.random() < 0.6 ? 22 : 42  // orange bis gelb
+                });
+            }
+            if (this.fireParticles.length > 130) this.fireParticles.splice(0, 35);
+        }
+
+        // Partikel physikalisch updaten
+        this.fireParticles = this.fireParticles.filter(p => {
+            p.x  += p.vx * dt;
+            p.y  += p.vy * dt;
+            p.vy *= 0.968;
+            p.vx *= 0.97;
+            p.size *= 0.984;
+            p.life -= dt * 1.9;
+            return p.life > 0 && p.size > 0.5;
+        });
+
         const trackAllowance = (this.labyrinthRun.trackWidth / 2) - this.ringForcePrototype.radius - 6;
         if (evaluation.dist > trackAllowance) {
             this.lose('Vom Parkour gefallen.');
             return;
+        }
+
+        // Spieler stirbt, wenn das Feuer ihn erreicht
+        if (dp && dangerProg > 0.01) {
+            const fireDx = this.ringForcePrototype.position.x - dp.x;
+            const fireDy = this.ringForcePrototype.position.y - dp.y;
+            const fireDist = Math.sqrt(fireDx * fireDx + fireDy * fireDy);
+            if (fireDist < this.ringForcePrototype.radius + this.labyrinthRun.trackWidth * 0.3) {
+                this.lose('Vom Feuer verschlungen!');
+                return;
+            }
         }
 
         const finishDx = this.ringForcePrototype.position.x - this.labyrinthRun.finishPoint.x;
@@ -1886,9 +2087,10 @@ class SchattenJaeger {
         this.updatePlayingHud();
     }
 
-    lose(msg) { 
-        this.state = 'LOSE'; 
-        this.playLoseSound(); 
+    lose(msg) {
+        this.state = 'LOSE';
+        this.stopFireSound();
+        this.playLoseSound();
         this.configureTouchControls();
 
         const loseMsg = document.getElementById('lose-msg');
@@ -1897,7 +2099,7 @@ class SchattenJaeger {
     }
 
     win() {
-        this.state = 'WIN'; this.playWinSound();
+        this.state = 'WIN'; this.stopFireSound(); this.playWinSound();
         this.configureTouchControls();
 
         const lvl = this.getCurrentLevel();
@@ -2132,82 +2334,119 @@ class SchattenJaeger {
         const pts = run.points;
         const tw = run.trackWidth;
 
-        const strokePath = () => {
+        // Gefahrenlinie berechnen
+        const fireHeadStart = 3;
+        const dangerProgress = !lvl ? 0
+            : this.timer <= fireHeadStart ? 0
+            : Math.min(1, (this.timer - fireHeadStart) / (lvl.targetValue - fireHeadStart));
+        const dp = this.getDangerPoint(dangerProgress);
+        const normalPts  = dp ? [dp, ...pts.slice(dp.segIdx)] : pts;
+
+        const strokePts = (points) => {
+            if (points.length < 2) return;
             this.ctx.beginPath();
-            this.ctx.moveTo(pts[0].x, pts[0].y);
-            for (let i = 1; i < pts.length; i++) this.ctx.lineTo(pts[i].x, pts[i].y);
+            this.ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) this.ctx.lineTo(points[i].x, points[i].y);
             this.ctx.stroke();
         };
 
         this.ctx.lineCap = 'round';
         this.ctx.lineJoin = 'round';
 
-        // 1. Äußerer Schatten/Rand
-        this.ctx.strokeStyle = '#050505';
-        this.ctx.lineWidth = tw + 18;
-        strokePath();
+        // --- Normaler Holzteil (ab Gefahrenlinie bis Ziel) ---
+        if (normalPts.length >= 2) {
+            // 1. Äußerer Schatten/Rand
+            this.ctx.strokeStyle = '#050505';
+            this.ctx.lineWidth = tw + 18;
+            strokePts(normalPts);
 
-        // 2. Dunkle Holzbasis
-        this.ctx.strokeStyle = '#5c3318';
-        this.ctx.lineWidth = tw;
-        strokePath();
+            // 2. Dunkle Holzbasis
+            this.ctx.strokeStyle = '#5c3318';
+            this.ctx.lineWidth = tw;
+            strokePts(normalPts);
 
-        // 3. Mittlerer Hellstreifen (gewölbter 3D-Look)
-        this.ctx.strokeStyle = '#7a4828';
-        this.ctx.lineWidth = tw - 10;
-        strokePath();
+            // 3. Mittlerer Hellstreifen
+            this.ctx.strokeStyle = '#7a4828';
+            this.ctx.lineWidth = tw - 10;
+            strokePts(normalPts);
 
-        // 4. Leichter Glanzstreifen in der Mitte
-        this.ctx.strokeStyle = 'rgba(200, 135, 60, 0.2)';
-        this.ctx.lineWidth = tw * 0.45;
-        strokePath();
+            // 4. Glanzstreifen
+            this.ctx.strokeStyle = 'rgba(200, 135, 60, 0.2)';
+            this.ctx.lineWidth = tw * 0.45;
+            strokePts(normalPts);
 
-        // 5. Bretterrillen (senkrechte Linien alle ~24px)
-        this.ctx.lineCap = 'butt';
-        for (let i = 1; i < pts.length; i++) {
-            const a = pts[i - 1], b = pts[i];
-            const dx = b.x - a.x, dy = b.y - a.y;
-            const len = Math.hypot(dx, dy);
-            if (len < 1) continue;
-            const ux = dx / len, uy = dy / len; // Einheitsvektor entlang Strecke
-            const nx = -uy, ny = ux;             // Senkrecht dazu
-            const hw = tw / 2 - 2;
+            // 5. Bretterrillen (senkrechte Linien alle ~24px, absolute Positionen am Track)
+            this.ctx.lineCap = 'butt';
             const spacing = 24;
-            const count = Math.floor(len / spacing);
-
-            for (let j = 1; j <= count; j++) {
-                const f = (j * spacing) / len;
-                const cx = a.x + dx * f, cy = a.y + dy * f;
-
-                // Dunkle Rille
-                this.ctx.beginPath();
-                this.ctx.moveTo(cx - nx * hw, cy - ny * hw);
-                this.ctx.lineTo(cx + nx * hw, cy + ny * hw);
-                this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.38)';
-                this.ctx.lineWidth = 2;
-                this.ctx.stroke();
-
-                // Helles Highlight direkt nach der Rille
-                this.ctx.beginPath();
-                this.ctx.moveTo(cx - nx * hw + ux * 2.5, cy - ny * hw + uy * 2.5);
-                this.ctx.lineTo(cx + nx * hw + ux * 2.5, cy + ny * hw + uy * 2.5);
-                this.ctx.strokeStyle = 'rgba(255, 195, 90, 0.16)';
-                this.ctx.lineWidth = 1;
-                this.ctx.stroke();
+            // Berechne den kumulativen Start-Offset für normalPts relativ zum gesamten Track
+            let normalStartDist = 0;
+            if (dp) {
+                normalStartDist = dangerProgress * run.totalLength;
             }
+            // Nächste Rillenposition nach normalStartDist
+            const firstPlank = Math.ceil(normalStartDist / spacing) * spacing;
+            let cumDist = normalStartDist;
+            for (let i = 1; i < normalPts.length; i++) {
+                const a = normalPts[i - 1], b = normalPts[i];
+                const dx = b.x - a.x, dy = b.y - a.y;
+                const len = Math.hypot(dx, dy);
+                if (len < 1) { cumDist += len; continue; }
+                const ux = dx / len, uy = dy / len;
+                const nx = -uy, ny = ux;
+                const hw = tw / 2 - 2;
+                const segStart = cumDist;
+                const segEnd = cumDist + len;
+                // Alle absoluten Rillen-Positionen in diesem Segment
+                let plankPos = firstPlank;
+                while (plankPos < segStart) plankPos += spacing;
+                while (plankPos <= segEnd) {
+                    const f = (plankPos - segStart) / len;
+                    const cx = a.x + dx * f, cy = a.y + dy * f;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(cx - nx * hw, cy - ny * hw);
+                    this.ctx.lineTo(cx + nx * hw, cy + ny * hw);
+                    this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.38)';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(cx - nx * hw + ux * 2.5, cy - ny * hw + uy * 2.5);
+                    this.ctx.lineTo(cx + nx * hw + ux * 2.5, cy + ny * hw + uy * 2.5);
+                    this.ctx.strokeStyle = 'rgba(255, 195, 90, 0.16)';
+                    this.ctx.lineWidth = 1;
+                    this.ctx.stroke();
+                    plankPos += spacing;
+                }
+                cumDist = segEnd;
+            }
+
+            this.ctx.lineCap = 'round';
+            this.ctx.lineJoin = 'round';
+            this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.32)';
+            this.ctx.lineWidth = tw;
+            strokePts(normalPts);
+            this.ctx.strokeStyle = 'rgba(160, 95, 40, 0.18)';
+            this.ctx.lineWidth = tw - 14;
+            strokePts(normalPts);
         }
 
-        // 6. Dunkle Kantenabdunklung für Tiefe
-        this.ctx.lineCap = 'round';
-        this.ctx.lineJoin = 'round';
-        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.32)';
-        this.ctx.lineWidth = tw;
-        strokePath();
+        // --- Verkohlter Teil — komplett transparent, nur Hintergrund sichtbar ---
+        // (kein Rendering nötig — der Steg fehlt einfach hinter dem Feuer)
 
-        // 7. Sichtbarer Farbauftrag (über Abdunklung)
-        this.ctx.strokeStyle = 'rgba(160, 95, 40, 0.18)';
-        this.ctx.lineWidth = tw - 14;
-        strokePath();
+        // --- Feuer-Partikel ---
+        if (this.fireParticles && this.fireParticles.length > 0) {
+            this.ctx.save();
+            this.ctx.globalCompositeOperation = 'screen';
+            for (const p of this.fireParticles) {
+                this.ctx.globalAlpha = p.life * 0.82;
+                this.ctx.shadowBlur = 12;
+                this.ctx.shadowColor = `hsl(${p.hue}, 100%, 65%)`;
+                this.ctx.fillStyle   = `hsl(${p.hue}, 100%, 58%)`;
+                this.ctx.beginPath();
+                this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+            this.ctx.restore();
+        }
 
         // === Start/Ziel-Balken ===
         const drawCheckeredBar = (x, y, trackAngle, label) => {
@@ -2272,7 +2511,9 @@ class SchattenJaeger {
         const pN1 = run.points[run.points.length - 2], pN = run.points[run.points.length - 1];
         const finishAngle = Math.atan2(pN.y - pN1.y, pN.x - pN1.x);
 
-        drawCheckeredBar(run.startPoint.x, run.startPoint.y, startAngle, 'START');
+        if (dangerProgress < 0.02) {
+            drawCheckeredBar(run.startPoint.x, run.startPoint.y, startAngle, 'START');
+        }
         drawCheckeredBar(run.finishPoint.x, run.finishPoint.y, finishAngle, 'ZIEL');
 
         // Ring und Spieler
