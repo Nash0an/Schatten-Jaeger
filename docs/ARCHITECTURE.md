@@ -206,6 +206,7 @@ Für `LABYRINTH_RING_DUO` und `LABYRINTH_RING_TRIO` gibt es noch kein wirklich g
 - Host bleibt Spieler 1 und bewegt die Figur lokal.
 - Der erste Joiner ueber `?join=<sessionId>` wird Lichtspieler.
 - Ein zweiter Joiner darf als Reserve beitreten, hat in v1 aber noch keine eigene Spielaktion.
+- Dieses System ist als erste spielbare Strecke eingebaut, aber noch nicht als breit getestete Mobile-Alltagsstrecke abzuhaken.
 
 ### Host-Ablauf
 - `startPartyLobby()` oeffnet die Lobby und erzeugt einen PeerJS-Host.
@@ -229,6 +230,11 @@ Für `LABYRINTH_RING_DUO` und `LABYRINTH_RING_TRIO` gibt es noch kein wirklich g
   - `session-full`
   - `host-missing`
   - `session-ended`
+
+### Wichtig fuer den naechsten Wiedereinstieg
+- `docs/MULTIPLAYER_CONCEPT.md` beschreibt ab jetzt sowohl den implementierten v1-Stand als auch die spaetere 3+-Spieler-Vision.
+- Fuer Party-Arbeit zuerst immer den aktuellen `COOP`-Host/Join-Flow gegen echtes Handy-Verhalten pruefen.
+- Ring oder Labyrinth ueber QR sind weiterhin kein bestehendes Feature, sondern Ausbaupfad.
 
 ## 15. Stabil vs. offen
 
