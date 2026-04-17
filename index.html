@@ -69,7 +69,8 @@
                     </div>
 
                     <button id="ring-force-btn" class="btn-secondary" type="button" onclick="game.startRingForcePrototype()">RING-FORCE PROTOTYP</button>
-                    <p class="text-hint margin-v-10">Physik-Sandbox: mit `1/2/3` zwischen einem, zwei und drei Spielern im Ring umschalten. Nur Druck gegen die Innenwand verschiebt den Ring.</p>
+                    <button class="btn-primary" type="button" onclick="game.startPartyLobby()" style="background: var(--primary); color: #000; font-weight: bold; margin-top: 10px;">PARTY MODUS STARTEN</button>
+                    <p class="text-hint margin-v-10">Hoste ein Spiel: Andere scannen den Code und steuern mit.</p>
                     <button id="audio-init-btn" class="btn-audio" onclick="game.initAudio()">Audio aktivieren</button>
                     
                     <h3 class="title-sub">Levelauswahl</h3>
@@ -104,12 +105,11 @@
                         </div>
                     </div>
 
-                    <button class="btn-secondary" type="button" disabled>LABYRINTH PARKOUR</button>
-                    <button class="btn-secondary" type="button" disabled>RING-FORCE PROTOTYP</button>
-                    <p class="text-hint margin-v-10">Physik-Sandbox: mit `1/2/3` zwischen einem, zwei und drei Spielern im Ring umschalten. Nur Druck gegen die Innenwand verschiebt den Ring.</p>
-                    
-                    <h3 class="title-sub">Levelauswahl</h3>
-                    <div id="labyrinth-level-select"></div>
+                    <button class="btn-secondary" type="button" onclick="game.startRingForcePrototype()">RING-FORCE PROTOTYP</button>
+                    <button class="btn-primary" type="button" onclick="game.startPartyLobby()" style="background: var(--primary); color: #000; font-weight: bold; margin-top: 10px;">PARTY MODUS STARTEN</button>
+                    <p class="text-hint margin-v-10">Hoste ein Spiel: Andere scannen den Code und steuern mit.</p>
+
+                    <h3 class="title-sub">Levelauswahl</h3>                    <div id="labyrinth-level-select"></div>
                     <button class="btn-reset-progress" type="button" onclick="game.resetProgress()">Fortschritt zurücksetzen</button>
                 </div>
             </div>
@@ -134,9 +134,25 @@
                 <button onclick="game.showMenu()">Menü</button>
             </div>
         </div>
+
+        <div id="party-overlay" class="overlay hidden">
+            <div class="ui-panel">
+                <h1 class="title-main">PARTY LOBBY</h1>
+                <p class="margin-v-10">Scanne den Code mit deinem Handy, um beizutreten.</p>
+                <div id="qrcode-container" class="margin-v-20" style="background: white; padding: 10px; display: inline-block;"></div>
+                <div id="player-list" class="margin-v-20">
+                    <div id="player-status-2" class="text-hint">Warte auf Spieler 2...</div>
+                    <div id="player-status-3" class="text-hint">Warte auf Spieler 3...</div>
+                </div>
+                <button id="start-party-game-btn" onclick="game.startPartyGame()" disabled>Spiel starten</button>
+                <button onclick="game.showMenu()" class="btn-secondary">Abbrechen</button>
+            </div>
+        </div>
     </div>
 
     <!-- Script-Reihenfolge ist wichtig, da game.js auf LEVELS zugreift -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="levels.js"></script>
     <script src="game.js"></script>
 </body>
