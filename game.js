@@ -27,6 +27,16 @@ class SchattenJaeger {
         this.labyrinthRun = null;
         this.levelStartCountdown = 0;
 
+        // Multiplayer / Party Mode
+        this.peer = null;
+        this.connections = [];
+        this.remoteInputs = {
+            2: { dx: 0, dy: 0, angle: 0, active: false },
+            3: { dx: 0, dy: 0, angle: 0, active: false }
+        };
+        this.isControllerMode = new URLSearchParams(window.location.search).has('join');
+        this.sessionId = new URLSearchParams(window.location.search).get('join');
+
         this.bgClassic = new Image();
         this.bgClassic.src = 'assets/images/bg-classic.png';
         this.bgLabyrinth = new Image();
@@ -57,6 +67,154 @@ class SchattenJaeger {
         this.setMenuTab(this.currentMenuTab, false); // Initialen Hintergrund setzen
         this.updateLevelSelect();
         this.loop();
+    }
+
+    initMultiplayer() {
+        if (this.peer) return;
+
+        // PeerJS-Konfiguration. Wir nutzen Standard-Server für Signaling.
+        // ID: SchattenJaeger-XXXX
+        const peerId = this.isControllerMode ? null : `SJ-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+        this.peer = new Peer(peerId);
+
+        this.peer.on('open', (id) => {
+            console.log(`Peer verbunden mit ID: ${id}`);
+            if (this.isControllerMode) {
+                this.connectToHost(this.sessionId);
+            }
+        });
+
+        this.peer.on('connection', (conn) => {
+            console.log(`Neue Verbindung von: ${conn.peer}`);
+            this.setupHostConnection(conn);
+        });
+
+        this.peer.on('error', (err) => {
+            console.error('PeerJS Fehler:', err);
+            if (err.type === 'peer-unavailable') {
+                alert('Host-Sitzung wurde nicht gefunden oder ist abgelaufen.');
+            }
+        });
+    }
+
+    startPartyLobby() {
+        this.initMultiplayer();
+        // Hier wird später der QR-Code generiert
+        this.showPartyOverlay();
+    }
+
+    showPartyOverlay() {
+        this.state = 'PARTY_LOBBY';
+        this.updateUI();
+
+        const container = document.getElementById('qrcode-container');
+        if (container) {
+            container.innerHTML = '';
+            
+            // Prüfung: Läuft das Spiel über einen Server?
+            if (window.location.protocol === 'file:') {
+                container.innerHTML = '<div style="color: black; font-size: 14px; padding: 10px;"><b>Hinweis:</b><br>Der Party-Modus benötigt einen Webserver.<br>Bitte starte das Spiel über eine IP-Adresse (z.B. http://192.168.x.x:8000) statt die Datei direkt zu öffnen.</div>';
+                return;
+            }
+
+            const joinUrl = window.location.href.split('?')[0] + '?join=' + this.peer.id;
+            
+            new QRCode(container, {
+                text: joinUrl,
+                width: 200,
+                height: 200,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+            console.log("QR Code generiert für:", joinUrl);
+            
+            // Wenn wir auf localhost sind, warnen, dass das Handy das eventuell nicht findet
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                const status2 = document.getElementById('player-status-2');
+                if (status2) status2.innerHTML = '<span style="color: #ffaa00;">Achtung: Du nutzt "localhost". Nutze deine Netzwerk-IP, damit dein Handy den Host findet!</span>';
+            }
+        }
+    }
+
+    startPartyGame() {
+        // Starte das erste Level im Trio-Ring-Modus als Standard für Party
+        this.gameMode = 'RING_TRIO';
+        this.startLevel(this.getFirstLevelId());
+    }
+
+    setupHostConnection(conn) {
+        conn.on('open', () => {
+            const slot = this.connections.length + 2; // P2, P3...
+            if (slot > 3) {
+                conn.send({ type: 'error', msg: 'Lobby voll' });
+                conn.close();
+                return;
+            }
+            conn.send({ type: 'slot-assigned', slot: slot });
+            this.connections.push({ conn, slot });
+            
+            // UI Update
+            const statusEl = document.getElementById(`player-status-${slot}`);
+            if (statusEl) {
+                statusEl.innerText = `Spieler ${slot} ist bereit!`;
+                statusEl.classList.remove('text-hint');
+                statusEl.style.color = '#44ff44';
+            }
+            
+            document.getElementById('start-party-game-btn').disabled = false;
+        });
+
+        conn.on('data', (data) => {
+            if (data.type === 'input') {
+                this.handleRemoteInput(data);
+            }
+        });
+
+        conn.on('close', () => {
+            this.connections = this.connections.filter(c => c.conn !== conn);
+            console.log('Verbindung getrennt.');
+        });
+    }
+
+    connectToHost(hostId) {
+        const conn = this.peer.connect(hostId);
+        conn.on('open', () => {
+            console.log('Mit Host verbunden.');
+            if (navigator.vibrate) navigator.vibrate(50); // Kurze Bestätigung
+        });
+
+        conn.on('data', (data) => {
+            if (data.type === 'slot-assigned') {
+                this.assignedSlot = data.slot;
+                console.log(`Zugeordnet zu Slot: ${this.assignedSlot}`);
+                if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+            }
+            if (data.type === 'error') {
+                alert(data.msg);
+            }
+        });
+
+        this.controllerConn = conn;
+    }
+
+    handleRemoteInput(data) {
+        if (this.remoteInputs[data.slot]) {
+            this.remoteInputs[data.slot].dx = data.dx || 0;
+            this.remoteInputs[data.slot].dy = data.dy || 0;
+            this.remoteInputs[data.slot].angle = data.angle || 0;
+            this.remoteInputs[data.slot].active = true;
+        }
+    }
+
+    sendInputToHost(inputData) {
+        if (this.controllerConn && this.controllerConn.open) {
+            this.controllerConn.send({
+                type: 'input',
+                slot: this.assignedSlot,
+                ...inputData
+            });
+        }
     }
 
     initAudio() {
@@ -1158,12 +1316,14 @@ class SchattenJaeger {
         const menu = document.getElementById('menu-overlay');
         const win = document.getElementById('win-overlay');
         const lose = document.getElementById('lose-overlay');
+        const party = document.getElementById('party-overlay');
         const hud = document.getElementById('hud');
 
         if (menu) menu.classList.toggle('hidden', this.state !== 'MENU');
         if (win) win.classList.toggle('hidden', this.state !== 'WIN');
         if (lose) lose.classList.toggle('hidden', this.state !== 'LOSE');
-        if (hud) hud.classList.toggle('hidden', this.state === 'MENU');
+        if (party) party.classList.toggle('hidden', this.state !== 'PARTY_LOBBY');
+        if (hud) hud.classList.toggle('hidden', this.state === 'MENU' || this.state === 'PARTY_LOBBY');
 
         if (this.state === 'PLAYING') {
             this.updatePlayingHud();
@@ -1318,6 +1478,13 @@ class SchattenJaeger {
             if (this.keys[controls.right]) inputX += 1;
             if (this.keys[controls.up]) inputY -= 1;
             if (this.keys[controls.down]) inputY += 1;
+
+            // Remote Inputs einbeziehen
+            const remote = this.remoteInputs[idx + 1];
+            if (remote && remote.active) {
+                inputX += remote.dx;
+                inputY += remote.dy;
+            }
 
             const inputMagnitude = Math.sqrt(inputX * inputX + inputY * inputY);
             if (inputMagnitude > 0) {
@@ -1577,6 +1744,12 @@ class SchattenJaeger {
             dx += this.joystickData.left.vectorX;
             dy += this.joystickData.left.vectorY;
 
+            // Remote Inputs für P1 (falls zugewiesen)
+            if (this.remoteInputs[1] && this.remoteInputs[1].active) {
+                dx += this.remoteInputs[1].dx;
+                dy += this.remoteInputs[1].dy;
+            }
+
             const mag = Math.sqrt(dx*dx + dy*dy);
             if (mag > 0) {
                 const speedMult = Math.min(1, mag);
@@ -1591,6 +1764,11 @@ class SchattenJaeger {
             // Rechter Joystick für P2 Lichtrotation
             if (this.joystickData.right.active) {
                 this.lightAngle += this.joystickData.right.vectorX * this.rotationSpeed * 1.5;
+            }
+
+            // Remote Inputs für P2 (Lichtrotation)
+            if (this.remoteInputs[2] && this.remoteInputs[2].active) {
+                this.lightAngle += this.remoteInputs[2].dx * this.rotationSpeed * 1.5;
             }
         }
         if (!this.isRingGameMode()) {
@@ -2213,9 +2391,47 @@ class SchattenJaeger {
         const now = performance.now();
         const dt = Math.min(0.05, (now - this.lastFrameTime) / 1000 || 1 / 60);
         this.lastFrameTime = now;
-        this.update(dt);
-        this.draw();
+
+        if (this.isControllerMode) {
+            this.updateController(dt);
+        } else {
+            this.update(dt);
+            this.draw();
+        }
         requestAnimationFrame(() => this.loop());
+    }
+
+    updateController(dt) {
+        if (!this.assignedSlot) {
+            // Wenn wir noch nicht zugewiesen sind, versuchen wir uns zu verbinden
+            if (!this.peer) this.initMultiplayer();
+        } else {
+            const input = {
+                dx: this.joystickData.left.vectorX,
+                dy: this.joystickData.left.vectorY
+            };
+            this.sendInputToHost(input);
+        }
+        
+        // Joysticks anzeigen (immer linker Joystick für Controller)
+        if (!this.touchInitialized) {
+            // Automatische Aktivierung im Controller-Modus
+            this.initTouch();
+        }
+        
+        this.joystickData.left.visible = true;
+        this.updateJoystickUI('left');
+        
+        // Hintergrund im Controller-Modus (schwarz)
+        this.ctx.fillStyle = '#111';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        this.ctx.fillStyle = '#fff';
+        this.ctx.textAlign = 'center';
+        this.ctx.font = '20px Segoe UI, sans-serif';
+        const status = this.assignedSlot ? `Verbunden als Spieler ${this.assignedSlot}` : "Verbinde mit Host...";
+        this.ctx.fillText(status, this.canvas.width / 2, 50);
+        this.ctx.fillText("Nutze den Joystick zur Steuerung", this.canvas.width / 2, 80);
     }
 }
 
