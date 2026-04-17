@@ -30,6 +30,7 @@ class SchattenJaeger {
         // Multiplayer / Party Mode
         this.peer = null;
         this.connections = [];
+        this.isLobbyOpen = false;
         this.remoteInputs = {
             2: { dx: 0, dy: 0, angle: 0, active: false },
             3: { dx: 0, dy: 0, angle: 0, active: false }
@@ -85,6 +86,10 @@ class SchattenJaeger {
         });
 
         this.peer.on('connection', (conn) => {
+            if (!this.isLobbyOpen) {
+                conn.close();
+                return;
+            }
             console.log(`Neue Verbindung von: ${conn.peer}`);
             this.setupHostConnection(conn);
         });
@@ -97,7 +102,14 @@ class SchattenJaeger {
         });
     }
 
+    closeLobbyAndStart() {
+        this.isLobbyOpen = false;
+        document.getElementById('close-lobby-btn').style.display = 'none';
+        this.startPartyGame();
+    }
+
     startPartyLobby() {
+        this.isLobbyOpen = true;
         this.initMultiplayer();
         // Hier wird später der QR-Code generiert
         this.showPartyOverlay();
@@ -2116,64 +2128,154 @@ class SchattenJaeger {
         this.ctx.save();
         this.drawBackground();
 
-        this.ctx.strokeStyle = '#1c1c1c';
+        // === Holzplanken-Steg ===
+        const pts = run.points;
+        const tw = run.trackWidth;
+
+        const strokePath = () => {
+            this.ctx.beginPath();
+            this.ctx.moveTo(pts[0].x, pts[0].y);
+            for (let i = 1; i < pts.length; i++) this.ctx.lineTo(pts[i].x, pts[i].y);
+            this.ctx.stroke();
+        };
+
         this.ctx.lineCap = 'round';
         this.ctx.lineJoin = 'round';
-        this.ctx.lineWidth = run.trackWidth + 28;
-        this.ctx.beginPath();
-        this.ctx.moveTo(run.points[0].x, run.points[0].y);
-        run.points.slice(1).forEach((pt) => this.ctx.lineTo(pt.x, pt.y));
-        this.ctx.stroke();
 
-        // Holzsteg-Textur
-        if (this.texWood.complete) {
-            const pattern = this.ctx.createPattern(this.texWood, 'repeat');
-            this.ctx.strokeStyle = pattern;
-        } else {
-            this.ctx.strokeStyle = '#4b4b4b';
+        // 1. Äußerer Schatten/Rand
+        this.ctx.strokeStyle = '#050505';
+        this.ctx.lineWidth = tw + 18;
+        strokePath();
+
+        // 2. Dunkle Holzbasis
+        this.ctx.strokeStyle = '#5c3318';
+        this.ctx.lineWidth = tw;
+        strokePath();
+
+        // 3. Mittlerer Hellstreifen (gewölbter 3D-Look)
+        this.ctx.strokeStyle = '#7a4828';
+        this.ctx.lineWidth = tw - 10;
+        strokePath();
+
+        // 4. Leichter Glanzstreifen in der Mitte
+        this.ctx.strokeStyle = 'rgba(200, 135, 60, 0.2)';
+        this.ctx.lineWidth = tw * 0.45;
+        strokePath();
+
+        // 5. Bretterrillen (senkrechte Linien alle ~24px)
+        this.ctx.lineCap = 'butt';
+        for (let i = 1; i < pts.length; i++) {
+            const a = pts[i - 1], b = pts[i];
+            const dx = b.x - a.x, dy = b.y - a.y;
+            const len = Math.hypot(dx, dy);
+            if (len < 1) continue;
+            const ux = dx / len, uy = dy / len; // Einheitsvektor entlang Strecke
+            const nx = -uy, ny = ux;             // Senkrecht dazu
+            const hw = tw / 2 - 2;
+            const spacing = 24;
+            const count = Math.floor(len / spacing);
+
+            for (let j = 1; j <= count; j++) {
+                const f = (j * spacing) / len;
+                const cx = a.x + dx * f, cy = a.y + dy * f;
+
+                // Dunkle Rille
+                this.ctx.beginPath();
+                this.ctx.moveTo(cx - nx * hw, cy - ny * hw);
+                this.ctx.lineTo(cx + nx * hw, cy + ny * hw);
+                this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.38)';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+
+                // Helles Highlight direkt nach der Rille
+                this.ctx.beginPath();
+                this.ctx.moveTo(cx - nx * hw + ux * 2.5, cy - ny * hw + uy * 2.5);
+                this.ctx.lineTo(cx + nx * hw + ux * 2.5, cy + ny * hw + uy * 2.5);
+                this.ctx.strokeStyle = 'rgba(255, 195, 90, 0.16)';
+                this.ctx.lineWidth = 1;
+                this.ctx.stroke();
+            }
         }
-        
-        this.ctx.lineWidth = run.trackWidth;
-        this.ctx.beginPath();
-        this.ctx.moveTo(run.points[0].x, run.points[0].y);
-        run.points.slice(1).forEach((pt) => this.ctx.lineTo(pt.x, pt.y));
-        this.ctx.stroke();
 
-        // Verdunkelung der Textur
-        this.ctx.strokeStyle = 'rgba(0,0,0,0.6)'; // Stärkere Verdunkelung
-        this.ctx.lineWidth = run.trackWidth;
-        this.ctx.beginPath();
-        this.ctx.moveTo(run.points[0].x, run.points[0].y);
-        run.points.slice(1).forEach((pt) => this.ctx.lineTo(pt.x, pt.y));
-        this.ctx.stroke();
+        // 6. Dunkle Kantenabdunklung für Tiefe
+        this.ctx.lineCap = 'round';
+        this.ctx.lineJoin = 'round';
+        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.32)';
+        this.ctx.lineWidth = tw;
+        strokePath();
 
-        // Schattenkante für Tiefe auf dem Holz
-        this.ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-        this.ctx.lineWidth = run.trackWidth;
-        this.ctx.beginPath();
-        this.ctx.moveTo(run.points[0].x, run.points[0].y);
-        run.points.slice(1).forEach((pt) => this.ctx.lineTo(pt.x, pt.y));
-        this.ctx.stroke();
+        // 7. Sichtbarer Farbauftrag (über Abdunklung)
+        this.ctx.strokeStyle = 'rgba(160, 95, 40, 0.18)';
+        this.ctx.lineWidth = tw - 14;
+        strokePath();
 
-        this.ctx.setLineDash([12, 14]);
-        this.ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-        this.ctx.lineWidth = 3;
-        this.ctx.beginPath();
-        this.ctx.moveTo(run.points[0].x, run.points[0].y);
-        run.points.slice(1).forEach((pt) => this.ctx.lineTo(pt.x, pt.y));
-        this.ctx.stroke();
-        this.ctx.setLineDash([]);
+        // === Start/Ziel-Balken ===
+        const drawCheckeredBar = (x, y, trackAngle, label) => {
+            const squareSize = 14;
+            const rows = 3;
+            const cols = Math.ceil(tw / squareSize);
+            const barThickness = rows * squareSize;
+            const barWidth = cols * squareSize;
 
-        this.ctx.fillStyle = '#44dd88';
-        this.ctx.beginPath();
-        this.ctx.arc(run.startPoint.x, run.startPoint.y, 18, 0, Math.PI * 2);
-        this.ctx.fill();
+            this.ctx.save();
+            this.ctx.translate(x, y);
+            this.ctx.rotate(trackAngle);
 
-        this.ctx.fillStyle = '#ff6666';
-        this.ctx.beginPath();
-        this.ctx.arc(run.finishPoint.x, run.finishPoint.y, 20, 0, Math.PI * 2);
-        this.ctx.fill();
+            // Karierte Kästchen
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    const isWhite = (row + col) % 2 === 0;
+                    this.ctx.fillStyle = isWhite ? '#ffffff' : '#1a1a1a';
+                    this.ctx.fillRect(
+                        row * squareSize - barThickness / 2,
+                        col * squareSize - barWidth / 2,
+                        squareSize, squareSize
+                    );
+                }
+            }
 
+            // Rahmen
+            this.ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+            this.ctx.lineWidth = 1.5;
+            this.ctx.strokeRect(-barThickness / 2, -barWidth / 2, barThickness, barWidth);
+
+            this.ctx.restore();
+
+            // Text AUSSERHALB des Stegs — senkrecht zur Strecke, jenseits der Stegkante
+            // Beide Seiten berechnen, die kanvasrandnähere Seite wählen
+            const perpX = -Math.sin(trackAngle);
+            const perpY =  Math.cos(trackAngle);
+            const textOffset = tw / 2 + 30;
+            const side1 = { x: x + perpX * textOffset, y: y + perpY * textOffset };
+            const side2 = { x: x - perpX * textOffset, y: y - perpY * textOffset };
+            const cx = this.canvas.width / 2, cy = this.canvas.height / 2;
+            // Seite wählen, die weiter vom Strecken-Mittelpunkt entfernt liegt
+            const d1 = (side1.x - cx) ** 2 + (side1.y - cy) ** 2;
+            const d2 = (side2.x - cx) ** 2 + (side2.y - cy) ** 2;
+            const tp = d1 > d2 ? side1 : side2;
+
+            this.ctx.save();
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.font = 'bold 20px Segoe UI, sans-serif';
+            this.ctx.lineWidth = 4;
+            this.ctx.strokeStyle = '#000000';
+            this.ctx.strokeText(label, tp.x, tp.y);
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.fillText(label, tp.x, tp.y);
+            this.ctx.restore();
+        };
+
+        // Winkel aus erstem / letztem Segment
+        const p0 = run.points[0], p1 = run.points[1];
+        const startAngle = Math.atan2(p1.y - p0.y, p1.x - p0.x);
+        const pN1 = run.points[run.points.length - 2], pN = run.points[run.points.length - 1];
+        const finishAngle = Math.atan2(pN.y - pN1.y, pN.x - pN1.x);
+
+        drawCheckeredBar(run.startPoint.x, run.startPoint.y, startAngle, 'START');
+        drawCheckeredBar(run.finishPoint.x, run.finishPoint.y, finishAngle, 'ZIEL');
+
+        // Ring und Spieler
         this.drawRingForceInLevel();
         this.ctx.fillStyle = '#fff';
         this.ctx.shadowBlur = 18;
@@ -2183,11 +2285,7 @@ class SchattenJaeger {
         this.ctx.fill();
         this.ctx.shadowBlur = 0;
 
-        this.ctx.fillStyle = '#fff';
-        this.ctx.textAlign = 'left';
-        this.ctx.font = 'bold 20px Segoe UI, sans-serif';
-        this.ctx.fillText(`Parkourbreite ${Math.round(run.trackWidth)} | Distanz ${run.totalLength.toFixed(0)}`, 24, this.canvas.height - 30);
-
+        // Mission Splash
         if (this.missionSplashTimer > 0) {
             let opacity = 1;
             if (this.missionSplashTimer < 60) opacity = this.missionSplashTimer / 60;
@@ -2199,6 +2297,7 @@ class SchattenJaeger {
             this.ctx.fillText(`${lvl.id}: ${lvl.name.toUpperCase()}`, this.canvas.width / 2, this.canvas.height / 2 - 176);
         }
 
+        // Countdown
         if (this.levelStartCountdown > 0) {
             const phase = Math.ceil(this.levelStartCountdown) - 1;
             const label = phase > 0 ? `${phase}` : 'LOS';
@@ -2209,6 +2308,7 @@ class SchattenJaeger {
             this.ctx.font = '18px Segoe UI, sans-serif';
             this.ctx.fillText('Die Zeit startet erst bei LOS', this.canvas.width / 2, this.canvas.height / 2 + 62);
         }
+
         this.ctx.restore();
     }
 
