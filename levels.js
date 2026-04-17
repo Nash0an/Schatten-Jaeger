@@ -50,3 +50,25 @@ const LEVELS = [
     { id: 49, name: "Absolute Dunkelheit", targetType: 'survival', targetValue: 40, pillarRadius: 25, pillarBehavior: 'moving', shadowKillRadius: null, enemyRadius: 8, enemySpeedStart: 3.5, enemySpeedMax: 6.0, spawnRateStart: 30, spawnRateMax: 5, acceleration: 0.2, lightBehavior: 'flickering' },
     { id: 50, name: "Schatten-König", targetType: 'score', targetValue: 2500, pillarRadius: 45, pillarBehavior: 'moving pulsating shrinking', shadowKillRadius: 250, enemyRadius: 10, enemySpeedStart: 3.5, enemySpeedMax: 8.0, spawnRateStart: 30, spawnRateMax: 5, acceleration: 0.25, lightBehavior: 'flickering' }
 ];
+
+const HEART_OBJECTIVE_LEVELS = {
+    18: { delay: 3 },
+    22: { delay: 3 },
+    26: { delay: 3 },
+    30: { delay: 2.5 },
+    34: { delay: 2.5 },
+    38: { delay: 2.5 },
+    42: { delay: 2 },
+    45: { delay: 2 },
+    48: { delay: 2 },
+    50: { delay: 1.5 }
+};
+
+LEVELS.forEach((lvl) => {
+    const heartConfig = HEART_OBJECTIVE_LEVELS[lvl.id];
+    if (!heartConfig) return;
+    lvl.collectHearts = {
+        count: 4,
+        delay: heartConfig.delay
+    };
+});

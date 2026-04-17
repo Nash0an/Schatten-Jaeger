@@ -11,6 +11,7 @@ class SchattenJaeger {
 
         this.state = 'MENU';
         this.gameMode = 'SOLO';
+        this.currentMenuTab = 'CLASSIC';
         this.currentLevelIdx = 0;
         this.score = 0;
         this.timer = 0;
@@ -22,6 +23,7 @@ class SchattenJaeger {
         this.shake = 0;
         this.spawnTimer = 0;
         this.missionSplashTimer = 0;
+        this.collectibleObjective = null;
 
         // Touch Data
         this.isTouchDevice = false; // Startet immer als false
@@ -407,6 +409,21 @@ class SchattenJaeger {
         document.getElementById('mode-ring-solo').classList.toggle('selected', mode === 'RING_SOLO');
         document.getElementById('mode-ring-duo').classList.toggle('selected', mode === 'RING_DUO');
         document.getElementById('mode-ring-trio').classList.toggle('selected', mode === 'RING_TRIO');
+        this.setMenuTab('CLASSIC');
+    }
+
+    setMenuTab(tab) {
+        this.currentMenuTab = tab;
+
+        const classicTab = document.getElementById('tab-classic');
+        const labyrinthTab = document.getElementById('tab-labyrinth');
+        const classicPanel = document.getElementById('panel-classic');
+        const labyrinthPanel = document.getElementById('panel-labyrinth');
+
+        if (classicTab) classicTab.classList.toggle('selected', tab === 'CLASSIC');
+        if (labyrinthTab) labyrinthTab.classList.toggle('selected', tab === 'LABYRINTH');
+        if (classicPanel) classicPanel.classList.toggle('active', tab === 'CLASSIC');
+        if (labyrinthPanel) labyrinthPanel.classList.toggle('active', tab === 'LABYRINTH');
     }
 
     bindEvents() {
@@ -439,11 +456,15 @@ class SchattenJaeger {
         const ringSoloCard = document.getElementById('mode-ring-solo');
         const ringDuoCard = document.getElementById('mode-ring-duo');
         const ringTrioCard = document.getElementById('mode-ring-trio');
+        const classicTab = document.getElementById('tab-classic');
+        const labyrinthTab = document.getElementById('tab-labyrinth');
         if (soloCard) soloCard.addEventListener('pointerup', () => this.setMode('SOLO'));
         if (coopCard) coopCard.addEventListener('pointerup', () => this.setMode('COOP'));
         if (ringSoloCard) ringSoloCard.addEventListener('pointerup', () => this.setMode('RING_SOLO'));
         if (ringDuoCard) ringDuoCard.addEventListener('pointerup', () => this.setMode('RING_DUO'));
         if (ringTrioCard) ringTrioCard.addEventListener('pointerup', () => this.setMode('RING_TRIO'));
+        if (classicTab) classicTab.addEventListener('pointerup', () => this.setMenuTab('CLASSIC'));
+        if (labyrinthTab) labyrinthTab.addEventListener('pointerup', () => this.setMenuTab('LABYRINTH'));
 
         // Globaler Touch-Listener zur Aktivierung der Touch-Steuerung
         window.addEventListener('touchstart', () => this.initTouch(), { once: true });
@@ -452,18 +473,7 @@ class SchattenJaeger {
     activateMasterMode() {
         this.masterModeActive = true;
         this.updateLevelSelect();
-        
-        // Visuelles Feedback
-        const startBtn = document.getElementById('main-start-btn');
-        if (startBtn) {
-            startBtn.innerText = "MEISTER-MODUS AKTIVIERT!";
-            startBtn.style.background = "#44ff44";
-            setTimeout(() => {
-                startBtn.style.background = "";
-                this.updateLevelSelect();
-            }, 2000);
-        }
-        
+
         // Kurzer Bestätigungssound
         if (this.audioCtx) {
             const osc = this.audioCtx.createOscillator();
@@ -481,16 +491,6 @@ class SchattenJaeger {
 
         this.masterModeActive = false;
         this.updateLevelSelect();
-
-        const startBtn = document.getElementById('main-start-btn');
-        if (startBtn) {
-            startBtn.innerText = "MEISTER-MODUS BEENDET";
-            startBtn.style.background = "#444";
-            setTimeout(() => {
-                startBtn.style.background = "";
-                this.updateLevelSelect();
-            }, 1500);
-        }
     }
 
 
@@ -647,10 +647,158 @@ class SchattenJaeger {
         }
     }
 
+    setupCollectibleObjective(lvl) {
+        if (!lvl || !lvl.collectHearts) {
+            this.collectibleObjective = null;
+            return;
+        }
+
+        this.collectibleObjective = {
+            delay: lvl.collectHearts.delay || 8,
+            count: lvl.collectHearts.count || 4,
+            spawned: false,
+            items: [],
+            collected: 0,
+            announceTimer: 0
+        };
+    }
+
+    getCollectibleStatusText() {
+        const objective = this.collectibleObjective;
+        if (!objective) return '';
+        if (!objective.spawned) {
+            const remaining = Math.max(0, Math.ceil(objective.delay - this.timer));
+            return ` | Kirschen in ${remaining}s`;
+        }
+        if (objective.collected >= objective.items.length) {
+            return ' | Kirschen komplett';
+        }
+        return ` | Kirschen ${objective.collected}/${objective.items.length}`;
+    }
+
+    updatePlayingHud() {
+        const lvl = LEVELS[this.currentLevelIdx];
+        if (!lvl || this.state !== 'PLAYING') return;
+
+        const hudLvl = document.getElementById('hud-level');
+        const hudTarget = document.getElementById('hud-target');
+        const scoreHud = document.getElementById('hud-score');
+        const timerHud = document.getElementById('hud-timer');
+
+        if (hudLvl) hudLvl.innerText = `${lvl.id}: ${lvl.name}`;
+
+        let targetText = "";
+        if (lvl.targetType === 'score') targetText = `${lvl.targetValue} Pkt`;
+        else if (lvl.targetType === 'survival') targetText = `${lvl.targetValue}s überleben`;
+        else if (lvl.targetType === 'pacifist') targetText = `${lvl.targetValue}s (max ${lvl.maxScore} Pkt)`;
+        if (hudTarget) hudTarget.innerText = `Ziel: ${targetText}${this.getCollectibleStatusText()}`;
+
+        if (scoreHud) scoreHud.innerText = `Score: ${this.score}`;
+        if (timerHud) {
+            const mins = Math.floor(this.timer / 60);
+            const secs = Math.floor(this.timer % 60);
+            const tenths = Math.floor((this.timer * 10) % 10);
+            timerHud.innerText = `Zeit: ${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${tenths}`;
+        }
+    }
+
+    getCollectibleSpawnPositions(count) {
+        const offsetX = Math.max(70, this.canvas.width * 0.11);
+        const offsetY = Math.max(70, this.canvas.height * 0.11);
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2;
+        const positions = [
+            { x: centerX - offsetX, y: centerY - offsetY },
+            { x: centerX + offsetX, y: centerY - offsetY },
+            { x: centerX - offsetX, y: centerY + offsetY },
+            { x: centerX + offsetX, y: centerY + offsetY }
+        ];
+
+        return positions.slice(0, count);
+    }
+
+    spawnCollectibleObjective() {
+        const objective = this.collectibleObjective;
+        if (!objective || objective.spawned) return;
+
+        objective.spawned = true;
+        objective.announceTimer = 180;
+        objective.items = this.getCollectibleSpawnPositions(objective.count).map((pos, idx) => ({
+            id: idx,
+            x: pos.x,
+            y: pos.y,
+            radius: 13,
+            collected: false,
+            phase: idx * 0.8
+        }));
+    }
+
+    getActiveCollectors() {
+        if (this.isRingGameMode()) {
+            return this.getActiveRingPlayers().map((player) => ({
+                x: player.worldPos.x,
+                y: player.worldPos.y,
+                radius: player.radius
+            }));
+        }
+
+        return [{
+            x: this.player.x,
+            y: this.player.y,
+            radius: this.player.radius
+        }];
+    }
+
+    updateCollectibleObjective(dt) {
+        const objective = this.collectibleObjective;
+        if (!objective) return;
+
+        if (!objective.spawned && this.timer >= objective.delay) {
+            this.spawnCollectibleObjective();
+        }
+        if (!objective.spawned) return;
+
+        if (objective.announceTimer > 0) {
+            objective.announceTimer--;
+        }
+
+        const collectors = this.getActiveCollectors();
+        objective.items.forEach((item) => {
+            if (item.collected) return;
+            for (const collector of collectors) {
+                const dx = collector.x - item.x;
+                const dy = collector.y - item.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist <= collector.radius + item.radius) {
+                    item.collected = true;
+                    objective.collected++;
+                    for (let i = 0; i < 10; i++) {
+                        this.particles.push({
+                            x: item.x,
+                            y: item.y,
+                            vx: (Math.random() - 0.5) * 6,
+                            vy: (Math.random() - 0.5) * 6,
+                            life: 1.0,
+                            color: '#ff6677',
+                            size: 3 + Math.random() * 3
+                        });
+                    }
+                    break;
+                }
+            }
+        });
+    }
+
+    hasPendingCollectibleObjective() {
+        const objective = this.collectibleObjective;
+        if (!objective) return false;
+        if (!objective.spawned) return true;
+        return objective.collected < objective.items.length;
+    }
+
     updateLevelSelect() {
         const container = document.getElementById('level-select');
         if (!container) return;
-        const suggestedStartLevel = this.getSuggestedStartLevel();
         container.innerHTML = '';
         LEVELS.forEach(lvl => {
             const btn = document.createElement('button');
@@ -667,10 +815,6 @@ class SchattenJaeger {
             btn.onclick = () => this.startLevel(lvl.id);
             container.appendChild(btn);
         });
-        const startBtn = document.getElementById('main-start-btn');
-        if (startBtn) {
-            startBtn.innerText = `LEVEL ${suggestedStartLevel} STARTEN`;
-        }
     }
 
     showMenu() {
@@ -707,6 +851,7 @@ class SchattenJaeger {
         this.pillar.baseRadius = lvl.pillarRadius;
         this.pillar.angle = 0;
         this.isLightOn = true;
+        this.setupCollectibleObjective(lvl);
         this.updatePillarPos();
         if (this.isRingGameMode()) {
             this.ringForcePrototype.activePlayerCount = this.getRingPlayerCountForMode();
@@ -758,16 +903,7 @@ class SchattenJaeger {
         if (hud) hud.classList.toggle('hidden', this.state === 'MENU');
 
         if (this.state === 'PLAYING') {
-            const lvl = LEVELS[this.currentLevelIdx];
-            const hudLvl = document.getElementById('hud-level');
-            const hudTarget = document.getElementById('hud-target');
-            if (hudLvl) hudLvl.innerText = `${lvl.id}: ${lvl.name}`;
-            
-            let targetText = "";
-            if (lvl.targetType === 'score') targetText = `${lvl.targetValue} Pkt`;
-            else if (lvl.targetType === 'survival') targetText = `${lvl.targetValue}s überleben`;
-            else if (lvl.targetType === 'pacifist') targetText = `${lvl.targetValue}s (max ${lvl.maxScore} Pkt)`;
-            if (hudTarget) hudTarget.innerText = `Ziel: ${targetText}`;
+            this.updatePlayingHud();
         } else if (this.state === 'RING_FORCE') {
             this.updateRingForceHud();
         }
@@ -1167,6 +1303,7 @@ class SchattenJaeger {
             this.player.x = this.ringForcePrototype.position.x;
             this.player.y = this.ringForcePrototype.position.y;
         }
+        this.updateCollectibleObjective(dt);
         const shadow = this.getShadowPoly();
         if (Math.random() < 1/currentSpawnRate) {
             const side = Math.floor(Math.random()*4);
@@ -1235,18 +1372,10 @@ class SchattenJaeger {
         }
         if (this.shake > 0) this.shake *= 0.9;
         if (this.state !== 'PLAYING') return;
-        if (lvl.targetType === 'score' && this.score >= lvl.targetValue) this.win();
-        if ((lvl.targetType === 'survival' || lvl.targetType === 'pacifist') && this.timer >= lvl.targetValue) this.win();
-        const scoreHud = document.getElementById('hud-score');
-        if (scoreHud) scoreHud.innerText = `Score: ${this.score}`;
-        
-        const timerHud = document.getElementById('hud-timer');
-        if (timerHud) {
-            const mins = Math.floor(this.timer / 60);
-            const secs = Math.floor(this.timer % 60);
-            const tenths = Math.floor((this.timer * 10) % 10);
-            timerHud.innerText = `Zeit: ${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${tenths}`;
-        }
+        const targetReached = (lvl.targetType === 'score' && this.score >= lvl.targetValue)
+            || ((lvl.targetType === 'survival' || lvl.targetType === 'pacifist') && this.timer >= lvl.targetValue);
+        if (targetReached && !this.hasPendingCollectibleObjective()) this.win();
+        this.updatePlayingHud();
     }
 
     lose(msg) { 
@@ -1302,6 +1431,55 @@ class SchattenJaeger {
         this.ctx.lineTo(endX - nx * headSize + ny * headSize * 0.7, endY - ny * headSize - nx * headSize * 0.7);
         this.ctx.closePath();
         this.ctx.fill();
+    }
+
+    drawCherryMarker(x, y, size, glowAlpha = 0.35) {
+        this.ctx.save();
+        this.ctx.translate(x, y);
+        this.ctx.shadowBlur = 18;
+        this.ctx.shadowColor = `rgba(255, 70, 90, ${glowAlpha})`;
+        this.ctx.strokeStyle = '#6bc15f';
+        this.ctx.lineWidth = Math.max(2, size * 0.12);
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, -size * 1.1);
+        this.ctx.quadraticCurveTo(-size * 0.2, -size * 1.9, -size * 0.75, -size * 1.7);
+        this.ctx.moveTo(0, -size * 1.1);
+        this.ctx.quadraticCurveTo(size * 0.2, -size * 1.9, size * 0.75, -size * 1.7);
+        this.ctx.stroke();
+
+        this.ctx.fillStyle = '#ff4d5f';
+        this.ctx.beginPath();
+        this.ctx.arc(-size * 0.5, size * 0.15, size * 0.58, 0, Math.PI * 2);
+        this.ctx.arc(size * 0.5, size * 0.15, size * 0.58, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+        this.ctx.beginPath();
+        this.ctx.arc(-size * 0.72, -size * 0.08, size * 0.16, 0, Math.PI * 2);
+        this.ctx.arc(size * 0.28, -size * 0.08, size * 0.16, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.restore();
+    }
+
+    drawCollectibleObjective() {
+        const objective = this.collectibleObjective;
+        if (!objective || !objective.spawned) return;
+
+        objective.items.forEach((item) => {
+            if (item.collected) return;
+            const pulse = 1 + Math.sin(this.timer * 5 + item.phase) * 0.12;
+            this.drawCherryMarker(item.x, item.y, item.radius * pulse);
+        });
+
+        if (objective.announceTimer > 0) {
+            const opacity = Math.min(1, objective.announceTimer / 45);
+            this.ctx.save();
+            this.ctx.fillStyle = `rgba(255, 120, 140, ${opacity})`;
+            this.ctx.textAlign = 'center';
+            this.ctx.font = 'bold 24px Segoe UI, sans-serif';
+            this.ctx.fillText('Sammle die Kirschen ein!', this.canvas.width / 2, 64);
+            this.ctx.restore();
+        }
     }
 
     drawRingForce() {
@@ -1446,6 +1624,7 @@ class SchattenJaeger {
             const s = (p.size || 2) * p.life;
             this.ctx.fillRect(p.x - s/2, p.y - s/2, s, s); 
         });
+        this.drawCollectibleObjective();
         this.enemies.forEach(e => { 
             const comboSize = e.comboSize || 1;
             const color = this.getComboColor(comboSize);
@@ -1519,6 +1698,10 @@ class SchattenJaeger {
             else if (lvl.targetType === 'pacifist') targetText = `PAZIFIST: ${lvl.targetValue}s (MAX ${lvl.maxScore} PKT)`;
             
             this.ctx.fillText(targetText, this.canvas.width / 2, this.canvas.height / 2 - 150);
+            if (lvl.collectHearts) {
+                this.ctx.font = 'bold 18px Segoe UI, sans-serif';
+                this.ctx.fillText(`FRUEH 4 KIRSCHEN EINSAMMELN`, this.canvas.width / 2, this.canvas.height / 2 - 118);
+            }
             this.ctx.font = '16px Segoe UI, sans-serif';
             this.ctx.fillText(`${lvl.id}: ${lvl.name.toUpperCase()}`, this.canvas.width / 2, this.canvas.height / 2 - 190);
             this.ctx.restore();

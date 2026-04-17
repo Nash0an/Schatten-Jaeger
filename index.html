@@ -27,41 +27,92 @@
         </div>
 
         <div id="menu-overlay" class="overlay">
-            <div class="ui-panel">
-                <h1 class="title-main">SCHATTEN-JÄGER</h1>
-                <p class="text-small">Nutze das Licht, um Feinde im Schatten zu vernichten.</p>
-                
-                <div class="mode-selection">
-                    <button id="mode-solo" class="mode-card selected" type="button" onclick="game.setMode('SOLO')">
-                        <h3 class="margin-v-10">SOLO</h3>
-                        <p class="controls-hint">Du bist das Licht.<br>WASD / Pfeile</p>
-                    </button>
-                    <button id="mode-coop" class="mode-card" type="button" onclick="game.setMode('COOP')">
-                        <h3 class="margin-v-10">KOOP</h3>
-                        <p class="controls-hint">P1: WASD (Laufen)<br>P2: Pfeile (Licht)</p>
-                    </button>
-                    <button id="mode-ring-solo" class="mode-card" type="button" onclick="game.setMode('RING_SOLO')">
-                        <h3 class="margin-v-10">RING SOLO</h3>
-                        <p class="controls-hint">P1: WASD<br>1 Spieler im Ring</p>
-                    </button>
-                    <button id="mode-ring-duo" class="mode-card" type="button" onclick="game.setMode('RING_DUO')">
-                        <h3 class="margin-v-10">RING DUO</h3>
-                        <p class="controls-hint">P1: WASD<br>P2: Pfeile</p>
-                    </button>
-                    <button id="mode-ring-trio" class="mode-card" type="button" onclick="game.setMode('RING_TRIO')">
-                        <h3 class="margin-v-10">RING TRIO</h3>
-                        <p class="controls-hint">P1: WASD<br>P2: Pfeile<br>P3: HBNM</p>
-                    </button>
+            <div class="ui-panel menu-panel">
+                <div id="panel-classic" class="menu-tab-panel active">
+                    <div class="menu-screen-head">
+                        <div>
+                            <h1 class="title-main">SCHATTEN-JÄGER</h1>
+                            <p class="text-small">Nutze das Licht, um Feinde im Schatten zu vernichten.</p>
+                        </div>
+                        <button id="tab-labyrinth" class="menu-switch-btn" type="button">LABYRINTH</button>
+                    </div>
+
+                    <div class="mode-group">
+                        <div class="mode-selection mode-selection-main">
+                            <button id="mode-solo" class="mode-card selected" type="button" onclick="game.setMode('SOLO')">
+                                <h3 class="margin-v-10">SOLO</h3>
+                                <p class="controls-hint">Du bist das Licht.<br>WASD / Pfeile</p>
+                            </button>
+                            <button id="mode-coop" class="mode-card" type="button" onclick="game.setMode('COOP')">
+                                <h3 class="margin-v-10">KOOP</h3>
+                                <p class="controls-hint">P1: WASD (Laufen)<br>P2: Pfeile (Licht)</p>
+                            </button>
+                        </div>
+                    </div>
+
+                    <h3 class="title-sub mode-group-title">RINGS</h3>
+                    <div class="mode-group">
+                        <div class="mode-selection">
+                            <button id="mode-ring-solo" class="mode-card" type="button" onclick="game.setMode('RING_SOLO')">
+                                <h3 class="margin-v-10">SOLO</h3>
+                                <p class="controls-hint">P1: WASD<br>1 Spieler im Ring</p>
+                            </button>
+                            <button id="mode-ring-duo" class="mode-card" type="button" onclick="game.setMode('RING_DUO')">
+                                <h3 class="margin-v-10">KOOP</h3>
+                                <p class="controls-hint">P1: WASD<br>P2: Pfeile</p>
+                            </button>
+                            <button id="mode-ring-trio" class="mode-card" type="button" onclick="game.setMode('RING_TRIO')">
+                                <h3 class="margin-v-10">TRIO</h3>
+                                <p class="controls-hint">P1: WASD<br>P2: Pfeile<br>P3: HBNM</p>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button id="ring-force-btn" class="btn-secondary" type="button" onclick="game.startRingForcePrototype()">RING-FORCE PROTOTYP</button>
+                    <p class="text-hint margin-v-10">Physik-Sandbox: mit `1/2/3` zwischen einem, zwei und drei Spielern im Ring umschalten. Nur Druck gegen die Innenwand verschiebt den Ring.</p>
+                    <button id="audio-init-btn" class="btn-audio" onclick="game.initAudio()">Audio aktivieren</button>
+                    
+                    <h3 class="title-sub">Levelauswahl</h3>
+                    <div id="level-select"></div>
+                    <button id="reset-progress-btn" class="btn-reset-progress" type="button" onclick="game.resetProgress()">Fortschritt zurücksetzen</button>
                 </div>
 
-                <button id="main-start-btn" onclick="game.startLevel(game.getHighestSelectableLevel())">SPIEL STARTEN</button>
-                <button id="ring-force-btn" class="btn-secondary" type="button" onclick="game.startRingForcePrototype()">RING-FORCE PROTOTYP</button>
-                <p class="text-hint margin-v-10">Physik-Sandbox: mit `1/2/3` zwischen einem, zwei und drei Spielern im Ring umschalten. Nur Druck gegen die Innenwand verschiebt den Ring.</p>
-                <button id="audio-init-btn" class="btn-audio" onclick="game.initAudio()">Audio aktivieren</button>
-                
-                <h3 class="title-sub">Levelauswahl</h3>
-                <div id="level-select"></div>
-                <button id="reset-progress-btn" class="btn-reset-progress" type="button" onclick="game.resetProgress()">Fortschritt zurücksetzen</button>
+                <div id="panel-labyrinth" class="menu-tab-panel">
+                    <div class="menu-screen-head">
+                        <div>
+                            <h1 class="title-main">LABYRINTH</h1>
+                            <p class="text-small">Nutze das Licht, um Feinde im Schatten zu vernichten.</p>
+                        </div>
+                        <button id="tab-classic" class="menu-switch-btn" type="button">SCHATTENJÄGER</button>
+                    </div>
+
+                    <h3 class="title-sub mode-group-title">RINGS</h3>
+                    <div class="mode-group">
+                        <div class="mode-selection">
+                            <button class="mode-card mode-card-placeholder" type="button" disabled>
+                                <h3 class="margin-v-10">SOLO</h3>
+                                <p class="controls-hint">Neuer Levelsatz fuer 1 Spieler</p>
+                            </button>
+                            <button class="mode-card mode-card-placeholder" type="button" disabled>
+                                <h3 class="margin-v-10">KOOP</h3>
+                                <p class="controls-hint">Neuer Levelsatz fuer 2 Spieler</p>
+                            </button>
+                            <button class="mode-card mode-card-placeholder" type="button" disabled>
+                                <h3 class="margin-v-10">TRIO</h3>
+                                <p class="controls-hint">Neuer Levelsatz fuer 3 Spieler</p>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button class="btn-secondary" type="button" disabled>LABYRINTH STARTET BALD</button>
+                    <button class="btn-secondary" type="button" disabled>RING-FORCE PROTOTYP</button>
+                    <p class="text-hint margin-v-10">Physik-Sandbox: mit `1/2/3` zwischen einem, zwei und drei Spielern im Ring umschalten. Nur Druck gegen die Innenwand verschiebt den Ring.</p>
+                    <button class="btn-audio" type="button" onclick="game.initAudio()">Audio aktivieren</button>
+                    
+                    <h3 class="title-sub">Levelauswahl</h3>
+                    <div class="level-select-placeholder"></div>
+                    <button class="btn-reset-progress" type="button" onclick="game.resetProgress()">Fortschritt zurücksetzen</button>
+                </div>
             </div>
         </div>
 

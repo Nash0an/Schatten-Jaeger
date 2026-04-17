@@ -8,12 +8,16 @@ Alle relevanten Änderungen an diesem Projekt werden hier dokumentiert.
 - Der Ring verschiebt sich nur durch aktiven Druck gegen seine Innenwand; ohne Druck bleibt er sofort stehen.
 - Neue Spielmodi `RING SOLO`, `RING DUO` und `RING TRIO` in den normalen Leveln.
 - Die Sandbox kann jetzt zwischen einem, zwei und drei Spielern umschalten.
+- Spätere Level können jetzt verzögerte Kirsch-Sammelziele aktivieren, die früh im Spielfeld erscheinen.
 
 ### Geändert
 - Stillstehende Spieler bleiben bei Ringbewegung zunächst in Weltkoordinaten stehen und werden erst von der nachrückenden Innenwand mitgenommen.
 - Pro Spieler wird der aktuelle Schub im Debug-Overlay deutlicher angezeigt.
 - Alle Level bleiben in der Levelauswahl anwählbar; erledigte Level sind hell, unerledigte bleiben dunkel.
 - Nach einer Niederlage kann das aktuelle Level jetzt direkt übersprungen werden.
+- Ein Level endet nun in diesen markierten Stufen erst, wenn sowohl das Hauptziel als auch alle erschienenen Kirschen erfüllt sind.
+- Das Startmenü trennt jetzt zwischen `Schattenjäger` und `Labyrinth` auf zwei Menübildschirmen mit Umschaltbutton.
+- Architektur-, Status-, Roadmap- und Einstiegsdokumente wurden auf den aktuellen Stand vor dem `Labyrinth`-Ausbau gebracht.
 
 ## [2.5.2] - 2026-04-15
 ### Geändert
