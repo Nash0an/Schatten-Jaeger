@@ -3,13 +3,14 @@ class SchattenJaeger {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
         this.audioCtx = null;
+        this.urlParams = new URLSearchParams(window.location.search);
 
         const saved = localStorage.getItem('sj_v2_data');
         this.saveData = saved ? JSON.parse(saved) : this.createFreshSaveData();
         this.masterModeActive = false;
         this.restoreProgressFromBests();
 
-        this.state = 'MENU';
+        this.state = this.urlParams.has('join') ? 'PARTY_JOIN' : 'MENU';
         this.gameMode = 'SOLO';
         this.currentMenuTab = 'CLASSIC';
         this.currentLevelIdx = 0;
@@ -31,12 +32,36 @@ class SchattenJaeger {
         this.peer = null;
         this.connections = [];
         this.isLobbyOpen = false;
+        this.assignedSlot = null;
+        this.controllerConn = null;
+        this.partyGameActive = false;
+        this.partyStartTimeouts = [];
         this.remoteInputs = {
             2: { dx: 0, dy: 0, angle: 0, active: false },
             3: { dx: 0, dy: 0, angle: 0, active: false }
         };
-        this.isControllerMode = new URLSearchParams(window.location.search).has('join');
-        this.sessionId = new URLSearchParams(window.location.search).get('join');
+        this.isControllerMode = this.urlParams.has('join');
+        this.sessionId = this.urlParams.get('join');
+        this.partyJoin = {
+            phase: this.isControllerMode ? 'CONNECTING' : 'IDLE',
+            status: this.isControllerMode ? 'Verbinde mit dem Host...' : '',
+            detail: this.isControllerMode ? 'Bleib auf dieser Seite. Du siehst hier Warteraum, Countdown und danach deinen Controller.' : '',
+            roleName: '',
+            roleHint: '',
+            countdownValue: '',
+            countdownEndsAt: 0,
+            roleAssigned: false
+        };
+        this.partyHost = {
+            joinUrl: '',
+            notice: '',
+            countdownValue: ''
+        };
+        this.isMobileGameplay = false;
+        this.requiresPortrait = false;
+        this.isPortraitGameplay = false;
+        this.viewportWidth = 0;
+        this.viewportHeight = 0;
 
         this.bgClassic = new Image();
         this.bgClassic.src = 'assets/images/bg-classic.png';
@@ -62,19 +87,89 @@ class SchattenJaeger {
         this.rotationSpeed = 0.08;
         this.lastFrameTime = performance.now();
         this.setupRingForcePrototype();
+        this.updateViewportMode();
 
         this.bindEvents();
+        if (this.isMobileGameplay) {
+            this.initTouch();
+        }
         this.resize();
         this.setMenuTab(this.currentMenuTab, false); // Initialen Hintergrund setzen
         this.updateLevelSelect();
+        this.updateUI();
         this.loop();
+    }
+
+    updateViewportMode() {
+        const width = window.innerWidth || document.documentElement.clientWidth || this.canvas.width || 0;
+        const height = window.innerHeight || document.documentElement.clientHeight || this.canvas.height || 0;
+        const coarsePointer = window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false;
+        const touchCapable = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
+        const smallViewport = Math.max(width, height) <= 1400 && Math.min(width, height) <= 900;
+
+        this.viewportWidth = width;
+        this.viewportHeight = height;
+        this.isMobileGameplay = (coarsePointer || touchCapable) && smallViewport;
+        this.requiresPortrait = this.isMobileGameplay;
+        this.isPortraitGameplay = !this.requiresPortrait || height >= width;
+        this.isTouchDevice = this.isTouchDevice || this.isMobileGameplay;
+
+        document.body.classList.toggle('mobile-portrait', this.isMobileGameplay && this.isPortraitGameplay);
+    }
+
+    shouldBlockForPortrait() {
+        return this.requiresPortrait && !this.isPortraitGameplay;
+    }
+
+    isPortraitRequired() {
+        return this.requiresPortrait;
+    }
+
+    isMobileLabyrinthLayout() {
+        return this.isMobileGameplay && this.isPortraitGameplay && this.isLabyrinthMode();
+    }
+
+    getGameplayFrame() {
+        if (this.isMobileGameplay && this.isPortraitGameplay) {
+            return {
+                left: 26,
+                right: this.canvas.width - 26,
+                top: 116,
+                bottom: this.canvas.height - 176
+            };
+        }
+
+        return {
+            left: 40,
+            right: this.canvas.width - 40,
+            top: 40,
+            bottom: this.canvas.height - 40
+        };
+    }
+
+    getGameplayFrameCenter() {
+        const frame = this.getGameplayFrame();
+        return {
+            x: (frame.left + frame.right) / 2,
+            y: (frame.top + frame.bottom) / 2
+        };
+    }
+
+    getClassicStartPoint() {
+        const frame = this.getGameplayFrame();
+        return {
+            x: (frame.left + frame.right) / 2,
+            y: frame.top + (frame.bottom - frame.top) * (this.isMobileGameplay && this.isPortraitGameplay ? 0.34 : 0.4)
+        };
+    }
+
+    releaseAllJoysticks() {
+        Object.keys(this.joystickData).forEach((side) => this.releaseJoystick(side));
     }
 
     initMultiplayer() {
         if (this.peer) return;
 
-        // PeerJS-Konfiguration. Wir nutzen Standard-Server für Signaling.
-        // ID: SchattenJaeger-XXXX
         const peerId = this.isControllerMode ? null : `SJ-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
         this.peer = new Peer(peerId);
 
@@ -82,11 +177,18 @@ class SchattenJaeger {
             console.log(`Peer verbunden mit ID: ${id}`);
             if (this.isControllerMode) {
                 this.connectToHost(this.sessionId);
+            } else {
+                this.partyHost.joinUrl = this.buildJoinUrl(id);
+                this.updatePartyHostUI();
+                if (this.state === 'PARTY_LOBBY') {
+                    this.showPartyOverlay();
+                }
             }
         });
 
         this.peer.on('connection', (conn) => {
             if (!this.isLobbyOpen) {
+                conn.send({ type: 'host-missing', msg: 'Die Lobby ist bereits geschlossen.' });
                 conn.close();
                 return;
             }
@@ -97,22 +199,38 @@ class SchattenJaeger {
         this.peer.on('error', (err) => {
             console.error('PeerJS Fehler:', err);
             if (err.type === 'peer-unavailable') {
-                alert('Host-Sitzung wurde nicht gefunden oder ist abgelaufen.');
+                if (this.isControllerMode) {
+                    this.setPartyJoinPhase('ERROR', 'Host-Sitzung wurde nicht gefunden.', 'Bitte scanne den QR-Code neu oder lass den Host die Lobby erneut oeffnen.');
+                } else {
+                    alert('Host-Sitzung wurde nicht gefunden oder ist abgelaufen.');
+                }
             }
         });
     }
 
     closeLobbyAndStart() {
+        if (!this.isLobbyOpen) return;
         this.isLobbyOpen = false;
-        document.getElementById('close-lobby-btn').style.display = 'none';
-        this.startPartyGame();
+        this.broadcastPartyMessage({ type: 'lobby-closed' });
+        this.partyHost.notice = 'Lobby geschlossen. Alle verbundenen Handys sehen jetzt den Startbildschirm.';
+        this.updatePartyHostUI();
     }
 
     startPartyLobby() {
+        this.clearPartyStartTimeouts();
+        this.setMode('COOP');
         this.isLobbyOpen = true;
+        this.partyGameActive = false;
+        this.resetRemoteInputs();
         this.initMultiplayer();
-        // Hier wird später der QR-Code generiert
+        this.connections = [];
+        this.partyHost.notice = 'Host bleibt Spieler 1 und bewegt die Figur. Der erste Joiner steuert das Licht.';
         this.showPartyOverlay();
+    }
+
+    buildJoinUrl(sessionId) {
+        const baseUrl = window.location.origin + window.location.pathname;
+        return `${baseUrl}?join=${encodeURIComponent(sessionId)}`;
     }
 
     showPartyOverlay() {
@@ -122,59 +240,257 @@ class SchattenJaeger {
         const container = document.getElementById('qrcode-container');
         if (container) {
             container.innerHTML = '';
-            
-            // Prüfung: Läuft das Spiel über einen Server?
             if (window.location.protocol === 'file:') {
-                container.innerHTML = '<div style="color: black; font-size: 14px; padding: 10px;"><b>Hinweis:</b><br>Der Party-Modus benötigt einen Webserver.<br>Bitte starte das Spiel über eine IP-Adresse (z.B. http://192.168.x.x:8000) statt die Datei direkt zu öffnen.</div>';
+                container.innerHTML = '<div style="color: black; font-size: 14px; padding: 10px;"><b>Hinweis:</b><br>Der Party-Modus benötigt einen Webserver.<br>Bitte starte das Spiel ueber eine IP-Adresse (z.B. http://192.168.x.x:8000) statt die Datei direkt zu oeffnen.</div>';
+                this.partyHost.notice = 'Kein Party-Modus ueber file://. Bitte starte einen lokalen Webserver.';
+                this.updatePartyHostUI();
                 return;
             }
 
-            const joinUrl = window.location.href.split('?')[0] + '?join=' + this.peer.id;
-            
+            const joinUrl = this.partyHost.joinUrl || (this.peer ? this.buildJoinUrl(this.peer.id) : '');
+            if (!joinUrl) {
+                this.partyHost.notice = 'Peer-Verbindung wird vorbereitet...';
+                this.updatePartyHostUI();
+                return;
+            }
+
             new QRCode(container, {
                 text: joinUrl,
                 width: 200,
                 height: 200,
-                colorDark : "#000000",
-                colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.H
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
             });
-            console.log("QR Code generiert für:", joinUrl);
-            
-            // Wenn wir auf localhost sind, warnen, dass das Handy das eventuell nicht findet
+            console.log("QR Code generiert fuer:", joinUrl);
+            this.partyHost.joinUrl = joinUrl;
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                const status2 = document.getElementById('player-status-2');
-                if (status2) status2.innerHTML = '<span style="color: #ffaa00;">Achtung: Du nutzt "localhost". Nutze deine Netzwerk-IP, damit dein Handy den Host findet!</span>';
+                this.partyHost.notice = 'Achtung: localhost funktioniert auf dem Handy meist nicht. Nutze stattdessen deine Netzwerk-IP.';
+            } else {
+                this.partyHost.notice = 'Scanne den Code mit dem Lichtspieler. Optional kann sich ein Reserve-Handy zuschalten.';
             }
+            this.updatePartyHostUI();
         }
     }
 
     startPartyGame() {
-        // Starte das erste Level im Trio-Ring-Modus als Standard für Party
-        this.gameMode = 'RING_TRIO';
-        this.startLevel(this.getFirstLevelId());
+        if (this.isLobbyOpen) {
+            this.partyHost.notice = 'Schliesse erst die Einladungen, bevor du den Countdown startest.';
+            this.updatePartyHostUI();
+            return;
+        }
+
+        if (!this.getConnectionBySlot(2)) {
+            this.partyHost.notice = 'Der Lichtspieler fehlt noch. Warte auf mindestens ein verbundenes Handy.';
+            this.updatePartyHostUI();
+            return;
+        }
+
+        this.clearPartyStartTimeouts();
+        this.broadcastPartyMessage({ type: 'countdown', value: 3 });
+        this.partyHost.notice = 'Countdown laeuft. Das Spiel startet fuer alle verbundenen Geraete.';
+        this.partyHost.countdownValue = '3';
+        this.updatePartyHostUI();
+
+        this.partyStartTimeouts.push(window.setTimeout(() => {
+            this.partyHost.countdownValue = '2';
+            this.updatePartyHostUI();
+        }, 1000));
+        this.partyStartTimeouts.push(window.setTimeout(() => {
+            this.partyHost.countdownValue = '1';
+            this.updatePartyHostUI();
+        }, 2000));
+        this.partyStartTimeouts.push(window.setTimeout(() => {
+            this.partyHost.countdownValue = '';
+            this.partyGameActive = true;
+            this.broadcastPartyMessage({ type: 'game-start', mode: 'COOP' });
+            this.gameMode = 'COOP';
+            this.startLevel(this.getFirstLevelId());
+            this.updatePartyHostUI();
+        }, 3000));
+    }
+
+    getConnectionBySlot(slot) {
+        return this.connections.find((entry) => entry.slot === slot) || null;
+    }
+
+    getRoleMetaForSlot(slot) {
+        if (slot === 2) {
+            return {
+                name: 'LICHT',
+                hint: 'Du drehst das Licht mit dem rechten Stick.'
+            };
+        }
+
+        return {
+            name: 'RESERVE',
+            hint: 'Du bist als Reserve verbunden und wartest auf eine spaetere Mehrspieler-Erweiterung.'
+        };
+    }
+
+    updatePartyPlayerStatus(slot, text, tone = 'hint') {
+        const el = document.getElementById(`player-status-${slot}`);
+        if (!el) return;
+
+        el.textContent = text;
+        el.classList.remove('text-hint', 'text-success', 'text-danger');
+        if (tone === 'success') el.classList.add('text-success');
+        else if (tone === 'danger') el.classList.add('text-danger');
+        else el.classList.add('text-hint');
+    }
+
+    updatePartyHostUI() {
+        const subtitle = document.getElementById('party-host-subtitle');
+        const url = document.getElementById('party-host-url');
+        const notice = document.getElementById('party-host-notice');
+        const closeBtn = document.getElementById('close-lobby-btn');
+        const startBtn = document.getElementById('start-party-game-btn');
+        const countdown = document.getElementById('party-host-countdown');
+
+        if (subtitle) {
+            subtitle.textContent = this.isLobbyOpen
+                ? 'Scanne den Code mit deinem Handy, um als Lichtspieler beizutreten.'
+                : 'Lobby geschlossen. Verbundene Handys sehen jetzt den Startbildschirm.';
+        }
+        if (url) url.textContent = this.partyHost.joinUrl || '';
+        if (notice) notice.textContent = this.partyHost.notice || '';
+        if (closeBtn) {
+            closeBtn.disabled = !this.isLobbyOpen;
+            closeBtn.textContent = this.isLobbyOpen ? 'Einladungen schliessen' : 'Einladungen geschlossen';
+        }
+        if (startBtn) startBtn.disabled = this.isLobbyOpen || !this.getConnectionBySlot(2);
+        if (countdown) {
+            countdown.textContent = this.partyHost.countdownValue || '';
+            countdown.classList.toggle('hidden', !this.partyHost.countdownValue);
+        }
+
+        if (!this.getConnectionBySlot(2)) {
+            this.updatePartyPlayerStatus(2, 'Lichtspieler: wartet auf Verbindung...', 'hint');
+        }
+        if (!this.getConnectionBySlot(3)) {
+            this.updatePartyPlayerStatus(3, 'Reserve: frei', 'hint');
+        }
+    }
+
+    setPartyJoinRole(slot) {
+        const role = this.getRoleMetaForSlot(slot);
+        this.partyJoin.roleAssigned = true;
+        this.partyJoin.roleName = role.name;
+        this.partyJoin.roleHint = role.hint;
+        this.updatePartyJoinUI();
+    }
+
+    setPartyJoinPhase(phase, status, detail = '') {
+        this.partyJoin.phase = phase;
+        this.partyJoin.status = status;
+        this.partyJoin.detail = detail;
+        if (phase !== 'COUNTDOWN') {
+            this.partyJoin.countdownValue = '';
+            this.partyJoin.countdownEndsAt = 0;
+        }
+        this.updatePartyJoinUI();
+    }
+
+    updatePartyJoinUI() {
+        const title = document.getElementById('party-join-title');
+        const status = document.getElementById('party-join-status');
+        const detail = document.getElementById('party-join-detail');
+        const roleCard = document.getElementById('party-join-role');
+        const roleName = document.getElementById('party-join-role-name');
+        const roleHint = document.getElementById('party-join-role-hint');
+        const countdown = document.getElementById('party-join-countdown');
+        const surface = document.getElementById('party-controller-surface');
+        const surfaceHint = document.getElementById('party-controller-hint');
+
+        if (title) {
+            if (this.partyJoin.phase === 'ACTIVE') title.textContent = 'SPIEL LAEUFT';
+            else if (this.partyJoin.phase === 'COUNTDOWN') title.textContent = 'SPIELSTART';
+            else if (this.partyJoin.phase === 'ERROR') title.textContent = 'VERBINDUNG GETRENNT';
+            else title.textContent = 'SESSION WIRD VERBUNDEN';
+        }
+        if (status) status.textContent = this.partyJoin.status || '';
+        if (detail) detail.textContent = this.partyJoin.detail || '';
+        if (roleCard) roleCard.classList.toggle('hidden', !this.partyJoin.roleAssigned);
+        if (roleName) roleName.textContent = this.partyJoin.roleName || '';
+        if (roleHint) roleHint.textContent = this.partyJoin.roleHint || '';
+        if (countdown) {
+            countdown.textContent = this.partyJoin.countdownValue || '';
+            countdown.classList.toggle('hidden', !this.partyJoin.countdownValue);
+        }
+        if (surface) surface.classList.toggle('hidden', this.partyJoin.phase !== 'ACTIVE');
+        if (surfaceHint) {
+            surfaceHint.textContent = this.assignedSlot === 2
+                ? 'Nutze den rechten Stick, um das Licht zu drehen.'
+                : 'Du bist als Reserve verbunden. Fuer v1 gibt es noch keine eigene Aktion.';
+        }
+    }
+
+    broadcastPartyMessage(payload) {
+        this.connections.forEach(({ conn }) => {
+            if (conn && conn.open) conn.send(payload);
+        });
+    }
+
+    clearPartyStartTimeouts() {
+        this.partyStartTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
+        this.partyStartTimeouts = [];
+        this.partyHost.countdownValue = '';
+    }
+
+    resetRemoteInputs() {
+        Object.values(this.remoteInputs).forEach((input) => {
+            input.dx = 0;
+            input.dy = 0;
+            input.angle = 0;
+            input.active = false;
+        });
+    }
+
+    shutdownPartySession(reason = 'session-ended') {
+        this.clearPartyStartTimeouts();
+        this.isLobbyOpen = false;
+        this.partyGameActive = false;
+        this.resetRemoteInputs();
+
+        if (!this.isControllerMode) {
+            this.broadcastPartyMessage({ type: reason });
+            this.connections.forEach(({ conn }) => {
+                try { conn.close(); } catch (e) {}
+            });
+            this.connections = [];
+        }
+
+        if (this.controllerConn) {
+            try { this.controllerConn.close(); } catch (e) {}
+            this.controllerConn = null;
+        }
+
+        if (this.peer) {
+            try { this.peer.destroy(); } catch (e) {}
+            this.peer = null;
+        }
     }
 
     setupHostConnection(conn) {
         conn.on('open', () => {
-            const slot = this.connections.length + 2; // P2, P3...
-            if (slot > 3) {
-                conn.send({ type: 'error', msg: 'Lobby voll' });
+            const occupiedSlots = new Set(this.connections.map((entry) => entry.slot));
+            const slot = !occupiedSlots.has(2) ? 2 : (!occupiedSlots.has(3) ? 3 : null);
+
+            if (!slot) {
+                conn.send({ type: 'session-full', msg: 'Die Lobby ist voll.' });
                 conn.close();
                 return;
             }
-            conn.send({ type: 'slot-assigned', slot: slot });
+
+            const role = this.getRoleMetaForSlot(slot);
+            conn.send({ type: 'joined' });
+            conn.send({ type: 'slot-assigned', slot, roleName: role.name, roleHint: role.hint });
             this.connections.push({ conn, slot });
-            
-            // UI Update
-            const statusEl = document.getElementById(`player-status-${slot}`);
-            if (statusEl) {
-                statusEl.innerText = `Spieler ${slot} ist bereit!`;
-                statusEl.classList.remove('text-hint');
-                statusEl.style.color = '#44ff44';
-            }
-            
-            document.getElementById('start-party-game-btn').disabled = false;
+            this.updatePartyPlayerStatus(slot, slot === 2 ? 'Lichtspieler verbunden' : 'Reserve verbunden', 'success');
+            this.partyHost.notice = slot === 2
+                ? 'Der Lichtspieler ist da. Du kannst die Einladungen schliessen und danach starten.'
+                : 'Ein Reserve-Handy ist verbunden. V1 nutzt aktiv nur den Lichtspieler.';
+            this.updatePartyHostUI();
         });
 
         conn.on('data', (data) => {
@@ -184,30 +500,100 @@ class SchattenJaeger {
         });
 
         conn.on('close', () => {
-            this.connections = this.connections.filter(c => c.conn !== conn);
+            const disconnected = this.connections.find((entry) => entry.conn === conn);
+            this.connections = this.connections.filter((entry) => entry.conn !== conn);
+
+            if (disconnected && this.remoteInputs[disconnected.slot]) {
+                this.remoteInputs[disconnected.slot].dx = 0;
+                this.remoteInputs[disconnected.slot].dy = 0;
+                this.remoteInputs[disconnected.slot].angle = 0;
+                this.remoteInputs[disconnected.slot].active = false;
+            }
+
+            if (disconnected) {
+                if (disconnected.slot === 2) {
+                    this.partyHost.notice = this.partyGameActive
+                        ? 'Der Lichtspieler hat die Verbindung verloren. Das Licht faellt auf Host-Steuerung zurueck.'
+                        : 'Der Lichtspieler hat die Lobby verlassen.';
+                    if (this.partyGameActive) {
+                        alert('Der Lichtspieler hat die Verbindung verloren. Du kannst das Licht jetzt wieder lokal steuern.');
+                    }
+                } else {
+                    this.partyHost.notice = 'Ein Reserve-Handy hat die Lobby verlassen.';
+                }
+                this.updatePartyHostUI();
+            }
             console.log('Verbindung getrennt.');
         });
     }
 
     connectToHost(hostId) {
+        if (!hostId) {
+            this.setPartyJoinPhase('ERROR', 'Keine Session-ID gefunden.', 'Bitte scanne den QR-Code direkt vom Host.');
+            return;
+        }
+
         const conn = this.peer.connect(hostId);
         conn.on('open', () => {
             console.log('Mit Host verbunden.');
-            if (navigator.vibrate) navigator.vibrate(50); // Kurze Bestätigung
+            this.setPartyJoinPhase('WAITING', 'Mit Host verbunden.', 'Warte auf Rollenzuteilung und den Start des Spiels.');
+            if (navigator.vibrate) navigator.vibrate(50);
         });
 
         conn.on('data', (data) => {
-            if (data.type === 'slot-assigned') {
-                this.assignedSlot = data.slot;
-                console.log(`Zugeordnet zu Slot: ${this.assignedSlot}`);
-                if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-            }
-            if (data.type === 'error') {
-                alert(data.msg);
-            }
+            this.handleControllerMessage(data);
+        });
+
+        conn.on('close', () => {
+            this.controllerConn = null;
+            this.assignedSlot = null;
+            this.releaseJoystick('left');
+            this.releaseJoystick('right');
+            this.setPartyJoinPhase('ERROR', 'Verbindung zum Host getrennt.', 'Bitte lass den Host die Lobby erneut oeffnen und scanne den QR-Code neu.');
         });
 
         this.controllerConn = conn;
+    }
+
+    handleControllerMessage(data) {
+        if (data.type === 'joined') {
+            this.setPartyJoinPhase('WAITING', 'Der Host hat dich in die Lobby aufgenommen.', 'Warte auf deine Rolle und darauf, dass der Host die Einladungen schliesst.');
+            return;
+        }
+
+        if (data.type === 'slot-assigned') {
+            this.assignedSlot = data.slot;
+            this.setPartyJoinRole(data.slot);
+            this.setPartyJoinPhase('WAITING', `Du bist als ${data.roleName} verbunden.`, data.roleHint);
+            if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+            return;
+        }
+
+        if (data.type === 'lobby-closed') {
+            this.setPartyJoinPhase('WAITING', 'Lobby geschlossen.', 'Bleib bereit. Der Host startet gleich den Countdown.');
+            return;
+        }
+
+        if (data.type === 'countdown') {
+            this.partyJoin.countdownEndsAt = performance.now() + (Number(data.value || 3) * 1000);
+            this.partyJoin.countdownValue = String(data.value || 3);
+            this.setPartyJoinPhase('COUNTDOWN', 'Das Spiel startet gleich.', 'Nach dem Countdown wird dein Controller live geschaltet.');
+            return;
+        }
+
+        if (data.type === 'game-start') {
+            this.setPartyJoinPhase('ACTIVE', 'Der Host spielt jetzt.', 'Dein Handy ist nun als Controller aktiv.');
+            return;
+        }
+
+        if (data.type === 'host-missing' || data.type === 'session-full') {
+            this.setPartyJoinPhase('ERROR', data.msg || 'Die Verbindung konnte nicht aufgebaut werden.', 'Bitte scanne den QR-Code neu.');
+            return;
+        }
+
+        if (data.type === 'session-ended') {
+            this.setPartyJoinPhase('ERROR', 'Die Host-Sitzung wurde beendet.', 'Die Runde ist vorbei oder der Host ist ins Menue zurueckgekehrt.');
+        }
     }
 
     handleRemoteInput(data) {
@@ -215,7 +601,7 @@ class SchattenJaeger {
             this.remoteInputs[data.slot].dx = data.dx || 0;
             this.remoteInputs[data.slot].dy = data.dy || 0;
             this.remoteInputs[data.slot].angle = data.angle || 0;
-            this.remoteInputs[data.slot].active = true;
+            this.remoteInputs[data.slot].active = Boolean(data.active !== false);
         }
     }
 
@@ -224,6 +610,7 @@ class SchattenJaeger {
             this.controllerConn.send({
                 type: 'input',
                 slot: this.assignedSlot,
+                active: true,
                 ...inputData
             });
         }
@@ -561,17 +948,21 @@ class SchattenJaeger {
         if (hudScore) hudScore.innerText = playerSummary;
     }
 
-    initTouch() {
-        if (this.touchInitialized) return;
-        this.isTouchDevice = true;
-        this.touchInitialized = true;
-        
-        window.addEventListener('touchstart', (e) => this.handleTouch(e), { passive: false });
-        window.addEventListener('touchmove', (e) => this.handleTouch(e), { passive: false });
-        window.addEventListener('touchend', (e) => this.handleTouch(e), { passive: false });
-        window.addEventListener('touchcancel', (e) => this.handleTouch(e), { passive: false });
-        
+    initTouch(initialEvent = null) {
+        if (!this.touchInitialized) {
+            this.isTouchDevice = true;
+            this.touchInitialized = true;
+
+            window.addEventListener('touchstart', (e) => this.handleTouch(e), { passive: false });
+            window.addEventListener('touchmove', (e) => this.handleTouch(e), { passive: false });
+            window.addEventListener('touchend', (e) => this.handleTouch(e), { passive: false });
+            window.addEventListener('touchcancel', (e) => this.handleTouch(e), { passive: false });
+        }
+
         this.configureTouchControls();
+        if (initialEvent) {
+            this.handleTouch(initialEvent);
+        }
     }
     playKillSound() {
         if (!this.audioCtx) return;
@@ -793,6 +1184,7 @@ class SchattenJaeger {
 
     bindEvents() {
         window.addEventListener('resize', () => this.resize());
+        window.addEventListener('orientationchange', () => this.resize());
         window.addEventListener('keydown', (e) => {
             if (this.state === 'RING_FORCE' && this.handleRingForceHotkeys(e)) {
                 return;
@@ -837,8 +1229,8 @@ class SchattenJaeger {
         if (classicTab) classicTab.addEventListener('pointerup', () => this.setMenuTab('CLASSIC'));
         if (labyrinthTab) labyrinthTab.addEventListener('pointerup', () => this.setMenuTab('LABYRINTH'));
 
-        // Globaler Touch-Listener zur Aktivierung der Touch-Steuerung
-        window.addEventListener('touchstart', () => this.initTouch(), { once: true });
+        // Ein frueher Touch soll direkt als echter Eingabestart gelten.
+        window.addEventListener('touchstart', (e) => this.initTouch(e), { once: true, passive: false });
     }
 
     activateMasterMode() {
@@ -864,21 +1256,42 @@ class SchattenJaeger {
         this.updateLevelSelect();
     }
 
-
     getJoystickCenter(side) {
-        const horizontalOffset = 110;
-        const bottomOffset = 110;
+        const isPortraitMobile = this.isMobileGameplay && this.isPortraitGameplay;
+        const horizontalOffset = isPortraitMobile
+            ? Math.max(82, Math.min(112, this.canvas.width * 0.21))
+            : Math.max(96, Math.min(140, this.canvas.width * 0.16));
+        const bottomOffset = isPortraitMobile
+            ? Math.max(98, Math.min(132, this.canvas.height * 0.13))
+            : Math.max(108, Math.min(150, this.canvas.height * 0.16));
+
+        if (this.isControllerMode && this.assignedSlot === 2 && this.partyJoin.phase === 'ACTIVE') {
+            return {
+                x: this.canvas.width / 2,
+                y: this.canvas.height - bottomOffset
+            };
+        }
+
         return {
             x: side === 'left' ? horizontalOffset : this.canvas.width - horizontalOffset,
             y: this.canvas.height - bottomOffset
         };
     }
 
+    canUseTouchControls() {
+        if (this.shouldBlockForPortrait()) return false;
+        return this.state === 'PLAYING' || (this.isControllerMode && this.state === 'PARTY_JOIN' && this.partyJoin.phase === 'ACTIVE');
+    }
+
     configureTouchControls() {
         if (!this.isTouchDevice) return;
+        if (this.shouldBlockForPortrait()) {
+            this.releaseAllJoysticks();
+        }
 
-        const showRight = this.state === 'PLAYING' && this.gameMode === 'COOP';
-        const showLeft = this.state === 'PLAYING';
+        const showControllerLight = this.isControllerMode && this.state === 'PARTY_JOIN' && this.partyJoin.phase === 'ACTIVE' && this.assignedSlot === 2;
+        const showRight = !this.shouldBlockForPortrait() && (showControllerLight || (this.state === 'PLAYING' && this.gameMode === 'COOP'));
+        const showLeft = !this.shouldBlockForPortrait() && !this.isControllerMode && this.state === 'PLAYING';
 
         ['left', 'right'].forEach(side => {
             const data = this.joystickData[side];
@@ -899,7 +1312,7 @@ class SchattenJaeger {
     }
 
     getJoystickTouchSide(x, y) {
-        const activationRadius = 70;
+        const activationRadius = 86;
 
         for (const side of ['left', 'right']) {
             const data = this.joystickData[side];
@@ -917,7 +1330,7 @@ class SchattenJaeger {
 
     updateJoystickVector(side, x, y) {
         const data = this.joystickData[side];
-        const maxRadius = 40;
+        const maxRadius = 48;
         const dx = x - data.centerX;
         const dy = y - data.centerY;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -944,7 +1357,7 @@ class SchattenJaeger {
     }
 
     handleTouch(e) {
-        if (this.state !== 'PLAYING') return;
+        if (!this.canUseTouchControls()) return;
         e.preventDefault();
 
         const touches = e.changedTouches;
@@ -994,15 +1407,86 @@ class SchattenJaeger {
         container.style.top = `${data.centerY}px`;
 
         const thumb = container.querySelector('.joystick-thumb');
-        const maxRadius = 40;
+        const maxRadius = 48;
         const tx = (data.active ? data.vectorX : 0) * maxRadius;
         const ty = (data.active ? data.vectorY : 0) * maxRadius;
         thumb.style.transform = `translate(-50%, -50%) translate(${tx}px, ${ty}px)`;
     }
 
+    getKeyboardVector(controlMap) {
+        let x = 0;
+        let y = 0;
+
+        if (this.keys[controlMap.left]) x -= 1;
+        if (this.keys[controlMap.right]) x += 1;
+        if (this.keys[controlMap.up]) y -= 1;
+        if (this.keys[controlMap.down]) y += 1;
+
+        return { x, y };
+    }
+
+    getRemoteVector(slot) {
+        const remote = this.remoteInputs[slot];
+        if (!remote || !remote.active) return { x: 0, y: 0 };
+        return { x: remote.dx || 0, y: remote.dy || 0 };
+    }
+
+    getTouchVector(side) {
+        const data = this.joystickData[side];
+        if (!data || !data.visible) return { x: 0, y: 0 };
+        return { x: data.vectorX || 0, y: data.vectorY || 0 };
+    }
+
+    combineInputVectors(vectors) {
+        return vectors.reduce((acc, vector) => {
+            acc.x += vector.x || 0;
+            acc.y += vector.y || 0;
+            return acc;
+        }, { x: 0, y: 0 });
+    }
+
+    getSoloMovementInput() {
+        return this.combineInputVectors([
+            this.getKeyboardVector({ left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS' }),
+            this.getKeyboardVector({ left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' }),
+            this.getTouchVector('left')
+        ]);
+    }
+
+    getCoopMovementInput() {
+        return this.combineInputVectors([
+            this.getKeyboardVector({ left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS' }),
+            this.getTouchVector('left')
+        ]);
+    }
+
+    getCoopLightRotationInput() {
+        const keyboard = this.getKeyboardVector({ left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' });
+        const touch = this.getTouchVector('right');
+        const remote = this.getRemoteVector(2);
+        return keyboard.x + touch.x + remote.x;
+    }
+
+    getRingPlayerInput(idx) {
+        const controlMaps = [
+            { left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS' },
+            { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' },
+            { left: 'KeyH', right: 'KeyN', up: 'KeyB', down: 'KeyM' }
+        ];
+        const vectors = [this.getKeyboardVector(controlMaps[idx]), this.getRemoteVector(idx + 1)];
+        if (idx === 0) vectors.push(this.getTouchVector('left'));
+        return this.combineInputVectors(vectors);
+    }
+
     resize() {
+        const oldWidth = this.viewportWidth;
+        const oldHeight = this.viewportHeight;
+        this.updateViewportMode();
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
+        if (oldWidth !== this.viewportWidth || oldHeight !== this.viewportHeight) {
+            this.releaseAllJoysticks();
+        }
         if (this.state === 'PLAYING' && this.isLabyrinthMode()) {
             this.setupLabyrinthRun(this.getCurrentLevel());
             this.ringForcePrototype.activePlayerCount = this.getRingPlayerCountForMode();
@@ -1024,13 +1508,15 @@ class SchattenJaeger {
             }
         }
         this.configureTouchControls();
+        this.updateUI();
     }
 
     updatePillarPos() {
         const lvl = this.getLevelsForMode()[this.currentLevelIdx];
+        const center = this.getGameplayFrameCenter();
         if (!lvl || lvl.pillarBehavior === 'static' || lvl.pillarBehavior === 'shrinking') {
-            this.pillar.x = this.canvas.width / 2;
-            this.pillar.y = this.canvas.height / 2;
+            this.pillar.x = center.x;
+            this.pillar.y = center.y;
         }
     }
 
@@ -1039,13 +1525,42 @@ class SchattenJaeger {
     }
 
     getScaledLabyrinthPath(level) {
-        const paddingX = 90;
-        const paddingY = 90;
-        const usableWidth = this.canvas.width - paddingX * 2;
-        const usableHeight = this.canvas.height - paddingY * 2;
-        return level.path.map((pt) => ({
-            x: paddingX + pt.x * usableWidth,
-            y: paddingY + pt.y * usableHeight
+        const frame = this.getGameplayFrame();
+        const frameWidth = Math.max(40, frame.right - frame.left);
+        const frameHeight = Math.max(40, frame.bottom - frame.top);
+        let path = level.path.map((pt) => ({ x: pt.x, y: pt.y }));
+
+        if (this.isMobileLabyrinthLayout()) {
+            path = path.map((pt) => ({
+                x: 1 - pt.y,
+                y: pt.x
+            }));
+        }
+
+        const bounds = path.reduce((acc, pt) => ({
+            minX: Math.min(acc.minX, pt.x),
+            maxX: Math.max(acc.maxX, pt.x),
+            minY: Math.min(acc.minY, pt.y),
+            maxY: Math.max(acc.maxY, pt.y)
+        }), { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
+
+        const width = Math.max(0.001, bounds.maxX - bounds.minX);
+        const height = Math.max(0.001, bounds.maxY - bounds.minY);
+        const ringRadius = this.ringForcePrototype ? this.ringForcePrototype.radius : 54;
+        const desktopEdgeAllowance = ringRadius + 26;
+        const mobileEdgeAllowance = (Math.max(74, Math.min(level.trackWidth * 0.74, this.canvas.width * 0.24)) / 2) + ringRadius + 24;
+        const edgeAllowance = this.isMobileLabyrinthLayout() ? mobileEdgeAllowance : desktopEdgeAllowance;
+        const innerWidth = Math.max(40, frameWidth - edgeAllowance * 2);
+        const innerHeight = Math.max(40, frameHeight - edgeAllowance * 2);
+        const fitWidth = this.isMobileLabyrinthLayout() ? innerWidth * 0.82 : innerWidth;
+        const fitHeight = this.isMobileLabyrinthLayout() ? innerHeight * 0.96 : innerHeight;
+        const scale = Math.min(fitWidth / width, fitHeight / height);
+        const offsetX = frame.left + edgeAllowance + (innerWidth - width * scale) / 2;
+        const offsetY = frame.top + edgeAllowance + (innerHeight - height * scale) / 2;
+
+        return path.map((pt) => ({
+            x: offsetX + (pt.x - bounds.minX) * scale,
+            y: offsetY + (pt.y - bounds.minY) * scale
         }));
     }
 
@@ -1105,18 +1620,21 @@ class SchattenJaeger {
         const points = this.getScaledLabyrinthPath(level);
         const geometry = this.buildLabyrinthGeometry(points);
         const timeLimit = this.getLabyrinthTimeLimit(level, geometry.totalLength);
+        const effectiveTrackWidth = this.isMobileLabyrinthLayout()
+            ? Math.max(74, Math.min(level.trackWidth * 0.74, this.canvas.width * 0.24))
+            : level.trackWidth;
         level.targetValue = timeLimit;
         this.labyrinthRun = {
             levelId: level.id,
             points,
             totalLength: geometry.totalLength,
             cumulative: geometry.cumulative,
-            trackWidth: level.trackWidth,
+            trackWidth: effectiveTrackWidth,
             timeLimit,
             progress: 0,
             nearestDistance: 0,
             offTrackGrace: 0,
-            finishRadius: 36,
+            finishRadius: Math.max(36, effectiveTrackWidth * 0.34),
             startPoint: points[0],
             finishPoint: points[points.length - 1]
         };
@@ -1381,7 +1899,11 @@ class SchattenJaeger {
     }
 
     showMenu() {
+        if (this.partyGameActive || this.isLobbyOpen || this.isControllerMode) {
+            this.shutdownPartySession();
+        }
         this.state = 'MENU';
+        this.partyGameActive = false;
         this.stopFireSound();
         this.updateUI();
         this.updateLevelSelect();
@@ -1401,6 +1923,10 @@ class SchattenJaeger {
 
     startLevel(id) {
         this.initAudio();
+        this.resetRemoteInputs();
+        if (this.isMobileGameplay) {
+            this.initTouch();
+        }
         const levels = this.getLevelsForMode();
         const lvl = levels.find(l => l.id === id);
         if (!lvl) return;
@@ -1414,8 +1940,9 @@ class SchattenJaeger {
         this.fireParticles = [];
         this.stopFireSound();
         this.fireAudioNodes = null;
-        this.player.x = this.canvas.width / 2;
-        this.player.y = this.canvas.height / 2 - 80;
+        const startPoint = this.getClassicStartPoint();
+        this.player.x = startPoint.x;
+        this.player.y = startPoint.y;
         this.spawnTimer = 60;
         this.missionSplashTimer = 180; // 3 Sekunden für bessere Lesbarkeit
         this.pillar.radius = lvl.pillarRadius || 0;
@@ -1474,18 +2001,29 @@ class SchattenJaeger {
         const win = document.getElementById('win-overlay');
         const lose = document.getElementById('lose-overlay');
         const party = document.getElementById('party-overlay');
+        const partyJoin = document.getElementById('party-join-overlay');
+        const rotateOverlay = document.getElementById('rotate-device-overlay');
         const hud = document.getElementById('hud');
 
-        if (menu) menu.classList.toggle('hidden', this.state !== 'MENU');
+        if (menu) menu.classList.toggle('hidden', this.state !== 'MENU' || this.isControllerMode);
         if (win) win.classList.toggle('hidden', this.state !== 'WIN');
         if (lose) lose.classList.toggle('hidden', this.state !== 'LOSE');
         if (party) party.classList.toggle('hidden', this.state !== 'PARTY_LOBBY');
-        if (hud) hud.classList.toggle('hidden', this.state === 'MENU' || this.state === 'PARTY_LOBBY');
+        if (partyJoin) partyJoin.classList.toggle('hidden', this.state !== 'PARTY_JOIN');
+        if (rotateOverlay) rotateOverlay.classList.toggle('hidden', !this.shouldBlockForPortrait());
+        if (hud) hud.classList.toggle('hidden', this.state === 'MENU' || this.state === 'PARTY_LOBBY' || this.state === 'PARTY_JOIN' || this.shouldBlockForPortrait());
 
         if (this.state === 'PLAYING') {
             this.updatePlayingHud();
         } else if (this.state === 'RING_FORCE') {
             this.updateRingForceHud();
+        }
+
+        if (this.state === 'PARTY_LOBBY') {
+            this.updatePartyHostUI();
+        }
+        if (this.state === 'PARTY_JOIN') {
+            this.updatePartyJoinUI();
         }
 
         const skipBtn = document.getElementById('skip-level-btn');
@@ -1617,31 +2155,14 @@ class SchattenJaeger {
     updateRingForce(dt) {
         const ring = this.ringForcePrototype;
         if (!ring) return;
-
-        const controlMaps = [
-            { left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS' },
-            { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' },
-            { left: 'KeyH', right: 'KeyN', up: 'KeyB', down: 'KeyM' }
-        ];
         let totalPushX = 0;
         let totalPushY = 0;
         let activePushers = 0;
 
         this.getActiveRingPlayers().forEach((player, idx) => {
-            const controls = controlMaps[idx];
-            let inputX = 0;
-            let inputY = 0;
-            if (this.keys[controls.left]) inputX -= 1;
-            if (this.keys[controls.right]) inputX += 1;
-            if (this.keys[controls.up]) inputY -= 1;
-            if (this.keys[controls.down]) inputY += 1;
-
-            // Remote Inputs einbeziehen
-            const remote = this.remoteInputs[idx + 1];
-            if (remote && remote.active) {
-                inputX += remote.dx;
-                inputY += remote.dy;
-            }
+            const input = this.getRingPlayerInput(idx);
+            let inputX = input.x;
+            let inputY = input.y;
 
             const inputMagnitude = Math.sqrt(inputX * inputX + inputY * inputY);
             if (inputMagnitude > 0) {
@@ -1743,10 +2264,11 @@ class SchattenJaeger {
             this.constrainRingForcePlayerInside(player);
         });
 
-        const leftBound = ring.radius + 40;
-        const rightBound = this.canvas.width - ring.radius - 40;
-        const topBound = ring.radius + 40;
-        const bottomBound = this.canvas.height - ring.radius - 40;
+        const frame = this.getGameplayFrame();
+        const leftBound = frame.left + ring.radius;
+        const rightBound = frame.right - ring.radius;
+        const topBound = frame.top + ring.radius;
+        const bottomBound = frame.bottom - ring.radius;
 
         if (ring.position.x < leftBound) {
             ring.position.x = leftBound;
@@ -1885,11 +2407,15 @@ class SchattenJaeger {
 
     update(dt = 1 / 60) {
         if (this.state === 'RING_FORCE') {
+            if (this.shouldBlockForPortrait()) return;
             this.updateRingForce(dt);
             return;
         }
 
         if (this.state !== 'PLAYING') return;
+        if (this.shouldBlockForPortrait()) {
+            return;
+        }
         if (this.spawnTimer > 0) this.spawnTimer--;
         if (this.missionSplashTimer > 0) this.missionSplashTimer--;
         if (this.isLabyrinthMode()) {
@@ -1901,13 +2427,17 @@ class SchattenJaeger {
         this.timer += 1/60;
         const currentEnemySpeed = lvl.enemySpeedStart + (lvl.enemySpeedMax - lvl.enemySpeedStart) * Math.min(1, this.timer * lvl.acceleration);
         const currentSpawnRate = lvl.spawnRateStart - (lvl.spawnRateStart - lvl.spawnRateMax) * Math.min(1, this.timer * lvl.acceleration);
+        const frame = this.getGameplayFrame();
+        const center = this.getGameplayFrameCenter();
         
         // Pillar Behavior (Unterstützt jetzt mehrere Effekte)
         const behavior = lvl.pillarBehavior || "";
         if (behavior.includes('moving')) {
             this.pillar.angle += 0.02;
-            this.pillar.x = this.canvas.width / 2 + Math.cos(this.pillar.angle) * 150;
-            this.pillar.y = this.canvas.height / 2 + Math.sin(this.pillar.angle * 1.5) * 100;
+            const orbitX = Math.max(70, (frame.right - frame.left) * (this.isMobileGameplay && this.isPortraitGameplay ? 0.2 : 0.28));
+            const orbitY = Math.max(56, (frame.bottom - frame.top) * (this.isMobileGameplay && this.isPortraitGameplay ? 0.12 : 0.22));
+            this.pillar.x = center.x + Math.cos(this.pillar.angle) * orbitX;
+            this.pillar.y = center.y + Math.sin(this.pillar.angle * 1.5) * orbitY;
         }
         if (behavior.includes('shrinking')) {
             this.pillar.radius = Math.max(10, this.pillar.baseRadius - this.timer * 0.8);
@@ -1930,15 +2460,9 @@ class SchattenJaeger {
         if (this.isRingGameMode()) {
             this.updateRingLevelMovement(dt);
         } else if (this.gameMode === 'SOLO') {
-            // Solo: WASD + Pfeile steuern die Bewegung
-            if (this.keys['ArrowUp'] || this.keys['KeyW']) dy -= 1;
-            if (this.keys['ArrowDown'] || this.keys['KeyS']) dy += 1;
-            if (this.keys['ArrowLeft'] || this.keys['KeyA']) dx -= 1;
-            if (this.keys['ArrowRight'] || this.keys['KeyD']) dx += 1;
-            
-            // Linker Joystick (oder einziger im Solo) zur Bewegung hinzufügen
-            dx += this.joystickData.left.vectorX;
-            dy += this.joystickData.left.vectorY;
+            const movement = this.getSoloMovementInput();
+            dx = movement.x;
+            dy = movement.y;
 
             const mag = Math.sqrt(dx*dx + dy*dy);
             if (mag > 0) {
@@ -1947,21 +2471,9 @@ class SchattenJaeger {
                 this.player.y += (dy/mag) * this.player.speed * speedMult;
             }
         } else {
-            // Koop: Nur WASD steuert P1 Bewegung
-            if (this.keys['KeyW']) dy -= 1;
-            if (this.keys['KeyS']) dy += 1;
-            if (this.keys['KeyA']) dx -= 1;
-            if (this.keys['KeyD']) dx += 1;
-            
-            // Linker Joystick für P1 Bewegung
-            dx += this.joystickData.left.vectorX;
-            dy += this.joystickData.left.vectorY;
-
-            // Remote Inputs für P1 (falls zugewiesen)
-            if (this.remoteInputs[1] && this.remoteInputs[1].active) {
-                dx += this.remoteInputs[1].dx;
-                dy += this.remoteInputs[1].dy;
-            }
+            const movement = this.getCoopMovementInput();
+            dx = movement.x;
+            dy = movement.y;
 
             const mag = Math.sqrt(dx*dx + dy*dy);
             if (mag > 0) {
@@ -1970,23 +2482,11 @@ class SchattenJaeger {
                 this.player.y += (dy/mag) * this.player.speed * speedMult;
             }
 
-            // Koop: Nur Pfeile steuern P2 Lichtrotation
-            if (this.keys['ArrowLeft']) this.lightAngle -= this.rotationSpeed;
-            if (this.keys['ArrowRight']) this.lightAngle += this.rotationSpeed;
-            
-            // Rechter Joystick für P2 Lichtrotation
-            if (this.joystickData.right.active) {
-                this.lightAngle += this.joystickData.right.vectorX * this.rotationSpeed * 1.5;
-            }
-
-            // Remote Inputs für P2 (Lichtrotation)
-            if (this.remoteInputs[2] && this.remoteInputs[2].active) {
-                this.lightAngle += this.remoteInputs[2].dx * this.rotationSpeed * 1.5;
-            }
+            this.lightAngle += this.getCoopLightRotationInput() * this.rotationSpeed * 1.5;
         }
         if (!this.isRingGameMode()) {
-            this.player.x = Math.max(this.player.radius, Math.min(this.canvas.width - this.player.radius, this.player.x));
-            this.player.y = Math.max(this.player.radius, Math.min(this.canvas.height - this.player.radius, this.player.y));
+            this.player.x = Math.max(frame.left + this.player.radius, Math.min(frame.right - this.player.radius, this.player.x));
+            this.player.y = Math.max(frame.top + this.player.radius, Math.min(frame.bottom - this.player.radius, this.player.y));
             const pdx=this.player.x-this.pillar.x, pdy=this.player.y-this.pillar.y, pdist=Math.sqrt(pdx*pdx+pdy*pdy);
             if (pdist < this.player.radius+this.pillar.radius){
                 const ang=Math.atan2(pdy,pdx);
@@ -1995,8 +2495,8 @@ class SchattenJaeger {
             }
         } else {
             const ringPadding = this.ringForcePrototype.radius + 10;
-            this.ringForcePrototype.position.x = Math.max(ringPadding, Math.min(this.canvas.width - ringPadding, this.ringForcePrototype.position.x));
-            this.ringForcePrototype.position.y = Math.max(ringPadding, Math.min(this.canvas.height - ringPadding, this.ringForcePrototype.position.y));
+            this.ringForcePrototype.position.x = Math.max(frame.left + ringPadding, Math.min(frame.right - ringPadding, this.ringForcePrototype.position.x));
+            this.ringForcePrototype.position.y = Math.max(frame.top + ringPadding, Math.min(frame.bottom - ringPadding, this.ringForcePrototype.position.y));
             const rdx = this.ringForcePrototype.position.x - this.pillar.x;
             const rdy = this.ringForcePrototype.position.y - this.pillar.y;
             const ringDist = Math.sqrt(rdx * rdx + rdy * rdy);
@@ -2017,10 +2517,10 @@ class SchattenJaeger {
         if (Math.random() < 1/currentSpawnRate) {
             const side = Math.floor(Math.random()*4);
             let ex, ey;
-            if(side===0){ex=Math.random()*this.canvas.width; ey=-20;}
-            else if(side===1){ex=this.canvas.width+20; ey=Math.random()*this.canvas.height;}
-            else if(side===2){ex=Math.random()*this.canvas.width; ey=this.canvas.height+20;}
-            else {ex=-20; ey=Math.random()*this.canvas.height;}
+            if(side===0){ex=frame.left + Math.random()*(frame.right-frame.left); ey=frame.top-20;}
+            else if(side===1){ex=frame.right+20; ey=frame.top + Math.random()*(frame.bottom-frame.top);}
+            else if(side===2){ex=frame.left + Math.random()*(frame.right-frame.left); ey=frame.bottom+20;}
+            else {ex=frame.left-20; ey=frame.top + Math.random()*(frame.bottom-frame.top);}
             const enemyRadius = lvl.enemyRadius || 12;
             const newEnemy = { x: ex, y: ey, radius: enemyRadius, speed: currentEnemySpeed };
             this.enemies.push(newEnemy);
@@ -2743,36 +3243,46 @@ class SchattenJaeger {
     }
 
     updateController(dt) {
+        if (this.shouldBlockForPortrait()) {
+            this.configureTouchControls();
+            return;
+        }
+
         if (!this.assignedSlot) {
-            // Wenn wir noch nicht zugewiesen sind, versuchen wir uns zu verbinden
             if (!this.peer) this.initMultiplayer();
-        } else {
+        }
+
+        if (this.partyJoin.phase === 'COUNTDOWN' && this.partyJoin.countdownEndsAt > 0) {
+            const remainingMs = Math.max(0, this.partyJoin.countdownEndsAt - performance.now());
+            const rounded = String(Math.max(1, Math.ceil(remainingMs / 1000)));
+            if (rounded !== this.partyJoin.countdownValue) {
+                this.partyJoin.countdownValue = rounded;
+                this.updatePartyJoinUI();
+            }
+        }
+
+        if (this.partyJoin.phase === 'ACTIVE' && this.assignedSlot === 2) {
             const input = {
-                dx: this.joystickData.left.vectorX,
-                dy: this.joystickData.left.vectorY
+                dx: this.joystickData.right.vectorX,
+                dy: 0
             };
             this.sendInputToHost(input);
         }
-        
-        // Joysticks anzeigen (immer linker Joystick für Controller)
+
         if (!this.touchInitialized) {
-            // Automatische Aktivierung im Controller-Modus
             this.initTouch();
         }
-        
-        this.joystickData.left.visible = true;
-        this.updateJoystickUI('left');
-        
-        // Hintergrund im Controller-Modus (schwarz)
+
+        this.configureTouchControls();
         this.ctx.fillStyle = '#111';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
+
         this.ctx.fillStyle = '#fff';
         this.ctx.textAlign = 'center';
         this.ctx.font = '20px Segoe UI, sans-serif';
-        const status = this.assignedSlot ? `Verbunden als Spieler ${this.assignedSlot}` : "Verbinde mit Host...";
+        const status = this.assignedSlot ? `Verbunden als Spieler ${this.assignedSlot}` : 'Verbinde mit Host...';
         this.ctx.fillText(status, this.canvas.width / 2, 50);
-        this.ctx.fillText("Nutze den Joystick zur Steuerung", this.canvas.width / 2, 80);
+        this.ctx.fillText('Bereit fuer QR-Party-Modus', this.canvas.width / 2, 80);
     }
 }
 

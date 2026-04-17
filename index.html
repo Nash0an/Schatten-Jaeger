@@ -138,15 +138,46 @@
         <div id="party-overlay" class="overlay hidden">
             <div class="ui-panel">
                 <h1 class="title-main">PARTY LOBBY</h1>
-                <p class="margin-v-10">Scanne den Code mit deinem Handy, um beizutreten.</p>
-                <div id="qrcode-container" class="margin-v-20" style="background: white; padding: 10px; display: inline-block;"></div>
+                <p id="party-host-subtitle" class="margin-v-10">Scanne den Code mit deinem Handy, um als Lichtspieler beizutreten.</p>
+                <div id="qrcode-container" class="margin-v-20 qrcode-shell"></div>
+                <div id="party-host-url" class="party-url margin-v-10"></div>
+                <div id="party-host-notice" class="text-hint margin-v-10">Host bleibt Spieler 1 und bewegt die Figur. Der erste Joiner steuert das Licht.</div>
                 <div id="player-list" class="margin-v-20">
-                    <div id="player-status-2" class="text-hint">Warte auf Spieler 2...</div>
-                    <div id="player-status-3" class="text-hint">Warte auf Spieler 3...</div>
+                    <div id="player-status-2" class="text-hint">Lichtspieler: wartet auf Verbindung...</div>
+                    <div id="player-status-3" class="text-hint">Reserve: frei</div>
                 </div>
-                <button id="close-lobby-btn" onclick="game.closeLobbyAndStart()">Anmeldung beenden & Spiel starten</button>
+                <div id="party-host-countdown" class="party-countdown hidden">3</div>
+                <button id="close-lobby-btn" onclick="game.closeLobbyAndStart()">Einladungen schliessen</button>
                 <button id="start-party-game-btn" onclick="game.startPartyGame()" disabled>Spiel starten</button>
                 <button onclick="game.showMenu()" class="btn-secondary">Abbrechen</button>
+            </div>
+        </div>
+
+        <div id="party-join-overlay" class="overlay hidden">
+            <div class="ui-panel join-panel">
+                <div class="join-badge">HANDY CONTROLLER</div>
+                <h1 id="party-join-title" class="title-main">SESSION WIRD VERBUNDEN</h1>
+                <p id="party-join-status" class="margin-v-10">Verbinde mit dem Host...</p>
+                <p id="party-join-detail" class="text-small margin-v-10">Bleib auf dieser Seite. Du siehst hier den Warteraum und den Start des Spiels.</p>
+                <div id="party-join-role" class="party-role-card hidden">
+                    <div class="party-role-label">DEINE ROLLE</div>
+                    <div id="party-join-role-name" class="party-role-name">LICHT</div>
+                    <div id="party-join-role-hint" class="text-hint">Du drehst das Licht mit dem rechten Stick.</div>
+                </div>
+                <div id="party-join-countdown" class="party-countdown hidden">3</div>
+                <div id="party-controller-surface" class="party-controller-surface hidden">
+                    <div class="party-surface-title">CONTROLLER BEREIT</div>
+                    <div id="party-controller-hint" class="text-hint">Nutze den rechten Stick, um das Licht zu drehen.</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="rotate-device-overlay" class="overlay hidden">
+            <div class="ui-panel rotate-panel">
+                <div class="rotate-badge">MOBILE MODUS</div>
+                <h1 class="title-main">BITTE HOCHKANT HALTEN</h1>
+                <p class="margin-v-10">Auf Handys laeuft Schatten-Jaeger jetzt im Hochformat.</p>
+                <p class="text-small">Drehe dein Geraet ins Portrait-Format, damit Steuerung, Level-Framing und Labyrinth-Pfade korrekt geladen werden.</p>
             </div>
         </div>
     </div>

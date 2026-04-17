@@ -39,6 +39,8 @@ Wenn du nach einer Pause wieder einsteigst, nimm diese Reihenfolge:
 - `PLAYING`
 - `WIN`
 - `LOSE`
+- `PARTY_LOBBY`
+- `PARTY_JOIN`
 - `RING_FORCE`
 
 `RING_FORCE` bleibt eine separate Sandbox. `PLAYING` deckt sowohl klassisches Hauptspiel als auch Labyrinth ab.
@@ -118,6 +120,7 @@ Aktuell werden diese Level algorithmisch erzeugt und sind als erste Testreihe ge
 ### Laufzeitlogik
 Beim Start eines Labyrinth-Levels wird:
 - der Pfad auf die aktuelle Bildschirmgröße skaliert,
+- auf Mobile-Portrait-Laufzeit zuerst um 90 Grad gedreht und neu eingerahmt,
 - die Parkour-Länge berechnet,
 - daraus ein Zeitlimit für den aktuellen Modus abgeleitet,
 - der Ring auf den Startpunkt gesetzt.
@@ -174,13 +177,60 @@ Der Wechsel erfolgt über `setMenuTab()`.
 Alle Levels sind direkt anwählbar. Der alte zentrale Startbutton wurde entfernt.
 
 ## 11. Touch
-- Touch wird erst nach echtem `touchstart` aktiviert.
+- Mobile-Geräte werden über Coarse-Pointer/Touch plus Viewport-Heuristik erkannt.
+- Auf Mobile wird Gameplay im Hochformat erzwungen; im Querformat blockiert ein Rotate-Overlay den Lauf.
+- Touch wird auf Mobile direkt beim Runtime-Start vorbereitet, damit der erste echte Stick-Kontakt bereits Eingabe liefert.
 - Linker Joystick: Bewegung.
 - Rechter Joystick: nur im klassischen `COOP` für Lichtrotation.
+- Im QR-Join-Modus nutzt der Lichtspieler ebenfalls den rechten Joystick; der Joiner landet zuerst im Warteraum und erst nach dem Countdown in der Controller-Ansicht.
 
 Für `LABYRINTH_RING_DUO` und `LABYRINTH_RING_TRIO` gibt es noch kein wirklich gutes Touch-Konzept.
 
-## 12. Stabil vs. offen
+## 12. Input-Schichten
+- Tastatur, lokaler Touch und Remote-Inputs laufen ueber gemeinsame Hilfsfunktionen statt ueber getrennte Spezialfaelle in jedem Modus.
+- `SOLO` kombiniert Tastatur plus linken Touch-Stick.
+- `COOP` trennt Bewegung und Lichtrotation logisch:
+  - Host / lokaler Spieler 1: Bewegung
+  - lokaler rechter Stick oder QR-Joiner: Lichtrotation
+- Ring-/Labyrinth-Modi nutzen dieselbe Input-Pipeline weiter; der linke Stick speist auch die Ringbewegung.
+
+## 13. Mobile Portrait Runtime
+- `isMobileGameplay`: aktiviert mobiles Framing, Portrait-Zwang und Touch-Layout.
+- `requiresPortrait`: blockiert Gameplay im Querformat auf Handys.
+- `isPortraitGameplay`: schaltet die mobilen Spielränder, HUD-Abstände und Joystick-Positionen.
+- Classic-Level werden auf Mobile nicht mathematisch rotiert, sondern neu eingerahmt.
+- Labyrinth-Pfade bleiben als ein Levelsatz in `levels.js`, werden aber zur Laufzeit fuer Mobile-Portrait gedreht und neu skaliert.
+
+## 14. Party-Modus v1
+- Zielmodus ist bewusst nur klassisches `COOP`.
+- Host bleibt Spieler 1 und bewegt die Figur lokal.
+- Der erste Joiner ueber `?join=<sessionId>` wird Lichtspieler.
+- Ein zweiter Joiner darf als Reserve beitreten, hat in v1 aber noch keine eigene Spielaktion.
+
+### Host-Ablauf
+- `startPartyLobby()` oeffnet die Lobby und erzeugt einen PeerJS-Host.
+- `showPartyOverlay()` zeigt QR-Code, Join-URL, Spielerstatus und Netzwerkhinweise.
+- `closeLobbyAndStart()` schliesst nur die Einladungen.
+- `startPartyGame()` sendet Countdown, danach `game-start`, und startet erst dann das Match.
+
+### Join-Ablauf
+- Joiner starten direkt im Zustand `PARTY_JOIN`.
+- Nach erfolgreichem Verbindungsaufbau sehen sie zuerst Warteraum und Rollenkarte.
+- Nach `lobby-closed` warten sie auf den Countdown.
+- Nach `game-start` wird die Controller-Oberflaeche freigeschaltet.
+
+### Nachrichtenmodell
+- Verwendete Hauptnachrichten:
+  - `joined`
+  - `slot-assigned`
+  - `lobby-closed`
+  - `countdown`
+  - `game-start`
+  - `session-full`
+  - `host-missing`
+  - `session-ended`
+
+## 15. Stabil vs. offen
 
 ### Stabil
 - Klassisches Hauptspiel mit `SOLO` und `COOP`.
@@ -188,9 +238,12 @@ Für `LABYRINTH_RING_DUO` und `LABYRINTH_RING_TRIO` gibt es noch kein wirklich g
 - Direkte Levelwahl und Skip-Logik.
 - Separater Labyrinth-Menüfluss.
 - Labyrinth-Grundengine mit Countdown, Zeitlimit, Absturz und Ziel.
+- Mobile Portrait-Gameplay mit Rotate-Overlay, neuem Framing und Labyrinth-Laufzeitrotation.
+- Party-Modus v1 fuer klassisches `COOP` mit Host-Lobby, QR-Join, Warteraum und Start-Countdown.
 
 ### Offen
 - Labyrinth-Zeiten vor allem für `DUO` und `TRIO`.
 - Qualität der generierten Labyrinth-Kurse.
 - Touch-Konzept für mehr als einen Ring-Spieler im Labyrinth.
+- Mehrspieler-Ring/Labyrinth ueber QR ist noch nicht Teil der freigegebenen Party-v1-Strecke.
 - Feintuning von Trackbreiten, Kurvenhärte und Koop-Zwang.

@@ -13,6 +13,8 @@ Diese Datei ist die praktische Übergabe für die weitere Entwicklung von Schatt
 - **Labyrinth-Evolution:** 50% breitere Pfade, organische Sinus-Kurven und dunkle Holztextur (`tex-wood.png`).
 - **UI-Polishing:** Zentrierte Menübuttons, konsistente Panel-Breite (700px), aufgehellte Overlays für bessere Bildwirkung.
 - **Visuals:** Erhöhte Lampen-Intensität, dunkle Schattenkanten, helleres Gesamtspielfeld für besseren Kontrast.
+- **Mobile Gameplay:** Portrait-Overlay, mobiles Spielfeld-Framing und runtime-gedrehte Labyrinth-Strecken fuer Handys.
+- **Touch-Steuerung:** Der erste echte Touch zaehlt jetzt direkt auch fuer Ring- und Labyrinth-Bewegung.
 
 ## Zukünftige Visionspunkte
 1. **Grafische Erweiterungen:**
@@ -38,14 +40,17 @@ Diese Datei ist die praktische Übergabe für die weitere Entwicklung von Schatt
 - **Grafik/Hintergrund:** `drawBackground()` in `game.js`.
 - **Labyrinth-Rendering:** `drawLabyrinth()` (beinhaltet die Holztextur-Logik).
 - **Pfad-Generierung:** `createLabyrinthPath()` in `levels.js`.
+- **Mobile Runtime / Framing:** `updateViewportMode()`, `getGameplayFrame()`, `getScaledLabyrinthPath()` in `game.js`.
 - **UI-Steuerung:** `setMenuTab()` und `.menu-switch-btn` im CSS.
 
 ## Bekannte offene Punkte
 - Sound-System ist noch rudimentär und wartet auf Ausbau.
 - Labyrinth-Zeiten für Duo/Trio benötigen noch breiteres Playtesting.
 - Handgebaute Level fehlen noch komplett im Labyrinth-Zweig.
+- Mobile Playtesting auf echten Geraeten bleibt wichtig, vor allem fuer Portrait-Raender und Ring-Labyrinth-Gefuehl.
 
 ## Empfohlene Testreihenfolge
 1. Visueller Check: Wechsel zwischen Classic- und Labyrinth-Menü (Hintergrundwechsel).
-2. Gameplay-Check: Ein Labyrinth-Level spielen (Holztextur, Kurvenverlauf, Breite).
-3. Performance-Check: Schattenwurf und Partikeleffekte bei vielen Gegnern.
+2. Mobile Check: Portrait erzwingen, Joystick testen, dann ein Labyrinth-Level auf dem Handy spielen.
+3. Gameplay-Check: Ein Desktop-Labyrinth-Level spielen (Holztextur, Kurvenverlauf, Breite).
+4. Performance-Check: Schattenwurf und Partikeleffekte bei vielen Gegnern.

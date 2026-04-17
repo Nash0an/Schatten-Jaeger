@@ -6,10 +6,13 @@
 ## Gerade wichtig
 - Klassisches Hauptspiel soll stabil bleiben.
 - Labyrinth ist jetzt nicht mehr nur Menü, sondern bereits spielbar.
-- Der nächste Schritt ist Balancing, nicht mehr Grundarchitektur.
+- Mobile Gameplay ist jetzt Portrait-first; Labyrinth wird auf Handys runtime-seitig gedreht und neu eingerahmt.
 - Für die Arbeitsaufnahme nach einer Pause ist `docs/DEV_HANDOFF.md` die wichtigste Datei.
 
 ## Was zuletzt eingebaut wurde
+- Mobile Portrait-Modus mit Rotate-Overlay
+- Touch-Fix fuer Ring/Labyrinth, damit der erste Stick-Kontakt direkt zaehlt
+- Laufzeit-Rotation fuer mobile Labyrinth-Pfade
 - Labyrinth-Modi:
   - `LABYRINTH_RING_SOLO`
   - `LABYRINTH_RING_DUO`
@@ -22,6 +25,7 @@
 
 ## Wo man zuerst schaut
 - Menü/Modi: `setMode()`, `setMenuTab()`, `refreshModeSelection()`
+- Mobile Runtime: `updateViewportMode()`, `getGameplayFrame()`, `configureTouchControls()`
 - Levelauswahl: `updateLevelSelect()`, `renderLevelSelect()`
 - Labyrinth-Setup: `setupLabyrinthRun()`
 - Labyrinth-Loop: `updateLabyrinth()`

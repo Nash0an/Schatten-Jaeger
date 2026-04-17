@@ -8,6 +8,8 @@ Alle relevanten Änderungen an diesem Projekt werden hier dokumentiert.
 - **Asset-Management:** Einführung einer professionellen Verzeichnisstruktur unter `assets/images/`.
 - **Visuelle Effekte:** Prozedurales Gitter (Grid) und Vignette-Effekt für mehr Tiefe und Atmosphäre.
 - **Labyrinth-Texturen:** Implementierung einer dunklen Holzsteg-Textur für den Parkour-Pfad.
+- **QR-Party-Modus v1:** Host-Lobby mit QR-Code, Join-Warteraum auf dem Handy, Rollenvergabe und Start-Countdown fuer klassisches `COOP`.
+- **Mobile Portrait Mode:** Handys erkennen jetzt ein eigenes Hochformat-Gameplay mit Rotate-Overlay, mobilen Spielfeldraendern und angepasstem HUD.
 
 ### Geändert
 - **Labyrinth-Engine:** Pfade sind nun 50% breiter und deutlich geschwungener/organischer generiert.
@@ -17,9 +19,15 @@ Alle relevanten Änderungen an diesem Projekt werden hier dokumentiert.
     - Menü-Umschaltbuttons (Schattenjäger/Labyrinth) sind nun exakt zentriert.
     - Menü-Panels haben eine konsistente Breite von 700px für stabilere Layouts auf dem Desktop.
     - Das Hauptmenü zeigt nun live den Hintergrund des jeweiligen Modus an.
+    - Mobile Joysticks sind groesser, stabiler positioniert und werden fuer lokalen `SOLO`/`COOP` sowie den QR-Lichtcontroller konsistent wiederverwendet.
+    - Party-Joiner landen nicht mehr direkt in einer nackten Controllerflaeche, sondern sehen zuerst Session-Status, Rolle und Spielstart.
+    - Eingaben fuer Tastatur, Touch und Remote-Controller laufen ueber eine gemeinsame Input-Schicht.
+    - Mobile Labyrinth-Level werden zur Laufzeit um 90 Grad gedreht, portrait-sicher eingerahmt und mit angepasster Trackbreite gespielt.
+    - Klassische Level nutzen auf Handys ein engeres Portrait-Framing fuer Startposition, Gegner-Spawns und Bewegungsraum.
 
 ### Bereinigt
 - Redundanter Audio-Aktivierungsbutton im Labyrinth-Menü entfernt.
+- Der erste Touch auf dem Handy wird nicht mehr von der Initialisierung verschluckt; Ring- und Labyrinth-Steuerung reagieren direkt.
 
 ## [2.5.3] - 2026-04-17
 ### Hinzugefügt
