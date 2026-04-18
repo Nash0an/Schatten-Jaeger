@@ -1,5 +1,11 @@
 # Roadmap: Schatten-Jäger
 
+## Prio 0: Menü- und Design-System V2.7.0 abschließen
+- [ ] Party aus dem Panik-Lauf-Menü auf den Labyrinth-Zweig routen.
+- [ ] Einstellungs-Toggles (Audio, Screen-Shake, Reduzierte Bewegung) in `localStorage` persistieren und auf das Spiel anwenden.
+- [ ] Level-Grid um expliziten Locked-Zustand erweitern.
+- [ ] Pause-Menü und In-Game-HUD auf das neue Design-System überführen.
+
 ## Prio 1: Labyrinth balancen
 - [ ] Level 1 bis 50 im Browser testen.
 - [ ] Zeitfenster für `LABYRINTH_RING_SOLO` feinziehen, bis kleine Fehler verzeihbar bleiben.

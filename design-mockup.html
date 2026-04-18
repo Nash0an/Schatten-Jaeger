@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Schatten-Jäger · Design-Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   FOUNDATION
+   ============================================================ */
+:root {
+  /* Neutralpalette — geteilt von beiden Spielen */
+  --bg:           #0a0a10;
+  --bg-deep:      #06060a;
+  --surface:      #14141c;
+  --surface-2:    #1d1d28;
+  --border:       #262633;
+  --border-warm:  #3a3a48;
+  --text:         #f0ead8;       /* warmes Cremeweiß */
+  --text-dim:     #7c7c8a;
+  --text-faint:   #4a4a55;
+  --danger:       #d94545;
+  --success:      #6fc99c;
+
+  /* Default-Akzent (auf Bildschirmen ohne Spielwahl, z. B. Geräteauswahl) */
+  --accent:        #f0ead8;
+  --accent-soft:   rgba(240, 234, 216, 0.10);
+  --accent-glow:   rgba(240, 234, 216, 0.25);
+  --theme-tint:    transparent;
+
+  /* Maße */
+  --gap: 16px;
+  --radius: 14px;
+  --radius-sm: 8px;
+  --touch: 48px;
+  --maxw: 1000px;
+
+  /* Typo */
+  --font-display: 'Bebas Neue', 'Impact', system-ui, sans-serif;
+  --font-body:    'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+/* Per-Spiel-Themes überschreiben den Akzent */
+.app[data-theme="shadow"] {
+  --accent:       #f5c460;            /* warmes Bernstein */
+  --accent-soft:  rgba(245, 196, 96, 0.10);
+  --accent-glow:  rgba(245, 196, 96, 0.40);
+  --theme-tint:   rgba(245, 196, 96, 0.03);
+}
+.app[data-theme="panic"] {
+  --accent:       #d68548;            /* warmes Honigholz */
+  --accent-soft:  rgba(214, 133, 72, 0.10);
+  --accent-glow:  rgba(255, 107, 53, 0.40);
+  --theme-tint:   rgba(214, 133, 72, 0.03);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, var(--theme-tint), transparent 70%),
+    radial-gradient(ellipse 100% 80% at 50% 100%, rgba(0,0,0,0.6), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Subtile Vignette */
+body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 80% 60% at 50% 50%, transparent 50%, rgba(0,0,0,0.5) 100%);
+  z-index: 0;
+}
+
+.app {
+  position: relative; z-index: 1;
+  width: 100%; max-width: var(--maxw); margin: 0 auto; padding: var(--gap);
+  min-height: 100vh; display: flex; flex-direction: column;
+  transition: --accent 0.5s ease;
+}
+
+/* ============================================================
+   TYPO-HIERARCHIE
+   ============================================================ */
+.display, h1, h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  margin: 0;
+  line-height: 1;
+}
+.text-eyebrow {
+  font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase;
+  color: var(--text-dim); font-weight: 600;
+}
+.text-dim { color: var(--text-dim); }
+.text-accent { color: var(--accent); }
+
+/* ============================================================
+   TOP BAR
+   ============================================================ */
+.topbar {
+  display: flex; align-items: center; gap: 8px;
+  min-height: var(--touch); margin-bottom: var(--gap);
+}
+.topbar__title {
+  font-family: var(--font-display); font-size: 22px; letter-spacing: 0.2em;
+  text-transform: uppercase; flex: 1; text-align: center; color: var(--text);
+}
+.topbar__spacer { width: var(--touch); height: var(--touch); flex: 0 0 auto; }
+
+.btn-icon {
+  width: var(--touch); height: var(--touch); flex: 0 0 auto;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  cursor: pointer; font-size: 20px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.btn-icon:hover { background: var(--surface-2); border-color: var(--accent); color: var(--accent); }
+.btn-icon:active { transform: scale(0.95); }
+
+/* ============================================================
+   SCREENS + ÜBERGÄNGE
+   ============================================================ */
+.screen { display: none; flex: 1; flex-direction: column; }
+.screen.active {
+  display: flex;
+  animation: screenIn .35s cubic-bezier(.2,.7,.3,1) both;
+}
+@keyframes screenIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   HERO / LOGO BLOCK
+   ============================================================ */
+.hero {
+  text-align: center;
+  padding: 24px 0 32px;
+}
+.hero__eyebrow {
+  font-size: 11px; letter-spacing: 0.4em; text-transform: uppercase;
+  color: var(--text-dim); margin-bottom: 14px;
+}
+.hero__title {
+  font-family: var(--font-display); font-size: clamp(40px, 8vw, 64px);
+  letter-spacing: 0.12em; line-height: 1; color: var(--text);
+}
+.hero__sub {
+  margin-top: 14px; color: var(--text-dim); font-size: 15px;
+  max-width: 480px; margin-left: auto; margin-right: auto;
+}
+
+/* ============================================================
+   GAME CARDS (Hauptmenü)
+   ============================================================ */
+.game-grid {
+  display: grid; gap: var(--gap);
+  grid-template-columns: 1fr;
+}
+@media (min-width: 720px) { .game-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.game-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer; overflow: hidden; padding: 0;
+  display: flex; flex-direction: column;
+  color: var(--text); text-align: left;
+  transition: transform .25s ease, border-color .25s, box-shadow .25s;
+  position: relative;
+}
+.game-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--gc-accent);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.5), 0 0 32px var(--gc-glow);
+}
+.game-card:active { transform: translateY(-2px); }
+
+.game-card__visual {
+  aspect-ratio: 16 / 10;
+  background: var(--gc-bg);
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+.game-card__visual svg { width: 70%; height: 70%; display: block; }
+
+.game-card__body { padding: 20px 22px 22px; }
+.game-card__title {
+  font-family: var(--font-display); font-size: 32px; letter-spacing: 0.12em;
+  margin: 0 0 6px; color: var(--text);
+}
+.game-card__sub { font-size: 14px; color: var(--text-dim); margin: 0; }
+
+/* Card-Themes */
+.game-card--shadow {
+  --gc-accent: #f5c460;
+  --gc-glow:   rgba(245, 196, 96, 0.30);
+  --gc-bg: radial-gradient(ellipse 60% 80% at 25% 50%, rgba(245,196,96,0.15), transparent 60%),
+           linear-gradient(135deg, #0a0a14 0%, #1a1830 100%);
+}
+.game-card--panic {
+  --gc-accent: #d68548;
+  --gc-glow:   rgba(255, 107, 53, 0.30);
+  --gc-bg: linear-gradient(180deg, #0a1820 0%, #0e3a4a 100%);
+}
+
+/* Animation auf Spiel-Visuals */
+.shadow-light-core {
+  animation: lightPulse 2.4s ease-in-out infinite;
+  transform-origin: center;
+}
+@keyframes lightPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.85; transform: scale(0.96); }
+}
+.fire-flame {
+  animation: fireFlicker .45s ease-in-out infinite alternate;
+  transform-origin: bottom center;
+}
+.fire-flame--small {
+  animation: fireFlicker .35s ease-in-out infinite alternate;
+  animation-delay: .1s;
+}
+@keyframes fireFlicker {
+  from { transform: scaleY(1)    translateY(0); opacity: 1; }
+  to   { transform: scaleY(1.08) translateY(-1px); opacity: 0.92; }
+}
+
+/* ============================================================
+   CARD GRIDS (Modus-Auswahl)
+   ============================================================ */
+.card-grid { display: grid; gap: var(--gap); grid-template-columns: 1fr; }
+@media (min-width: 600px) { .card-grid.cols-2 { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 720px) { .card-grid.cols-3 { grid-template-columns: repeat(3, 1fr); } }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px 20px; min-height: 120px;
+  cursor: pointer; color: var(--text);
+  display: flex; flex-direction: column; justify-content: center;
+  text-align: center; gap: 6px;
+  transition: background .15s, border-color .15s, transform .15s;
+}
+.card:hover { background: var(--surface-2); border-color: var(--accent); }
+.card:active { transform: scale(0.98); }
+.card__title {
+  font-family: var(--font-display); font-size: 24px; letter-spacing: 0.15em;
+  margin: 0; color: var(--text);
+}
+.card__sub { font-size: 13px; color: var(--text-dim); margin: 0; }
+
+.card--featured {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, var(--surface) 0%, var(--accent-soft) 100%);
+}
+.card--featured .card__title { color: var(--accent); }
+
+/* ============================================================
+   SECTION HEADER
+   ============================================================ */
+.section-title {
+  font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase;
+  color: var(--text-dim); margin: 8px 0 12px; font-weight: 600;
+  display: flex; align-items: center; gap: 12px;
+}
+.section-title::before, .section-title::after {
+  content: ""; height: 1px; background: var(--border); flex: 1;
+}
+
+/* ============================================================
+   DEVICE SELECT
+   ============================================================ */
+.device-grid {
+  display: grid; gap: var(--gap); grid-template-columns: 1fr;
+}
+@media (min-width: 640px) { .device-grid { grid-template-columns: repeat(3, 1fr); } }
+
+.device-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 28px 16px; min-height: 180px;
+  text-align: center; cursor: pointer; color: var(--text);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  transition: background .15s, border-color .15s, transform .15s;
+}
+.device-card:hover { background: var(--surface-2); border-color: var(--accent); transform: translateY(-2px); }
+.device-card:active { transform: translateY(0); }
+.device-card svg { width: 44px; height: 44px; color: var(--text-dim); }
+.device-card:hover svg { color: var(--accent); }
+
+/* ============================================================
+   LEVEL GRID
+   ============================================================ */
+.level-grid {
+  display: grid; gap: 8px; grid-template-columns: repeat(5, 1fr);
+}
+@media (min-width: 600px) { .level-grid { grid-template-columns: repeat(7, 1fr); } }
+@media (min-width: 800px) { .level-grid { grid-template-columns: repeat(10, 1fr); } }
+
+.level-cell {
+  aspect-ratio: 1; min-height: 56px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  cursor: pointer; padding: 4px 2px; gap: 2px; color: var(--text);
+  position: relative; transition: border-color .15s, background .15s, transform .15s;
+}
+.level-cell:hover:not(.locked) {
+  border-color: var(--accent); background: var(--surface-2); transform: translateY(-1px);
+}
+.level-cell .num { font-family: var(--font-display); font-size: 20px; letter-spacing: 0.05em; line-height: 1; }
+.level-cell .best { font-size: 9px; color: var(--text-dim); line-height: 1; font-weight: 500; }
+
+.level-cell.solved {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, var(--surface) 0%, var(--accent-soft) 100%);
+}
+.level-cell.solved .num { color: var(--accent); }
+.level-cell.solved::after {
+  content: "✓"; position: absolute; top: 3px; right: 5px;
+  font-size: 10px; color: var(--accent); font-weight: 700;
+}
+
+.level-cell.open { border-color: var(--accent); }
+.level-cell.open .num { color: var(--text); }
+.level-cell.open::before {
+  content: ""; position: absolute; inset: -1px; border-radius: var(--radius-sm);
+  border: 1px solid var(--accent); opacity: 0.6;
+  animation: openPulse 2s ease-in-out infinite;
+}
+@keyframes openPulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 0.9; }
+}
+
+.level-cell.locked { opacity: 0.35; cursor: not-allowed; }
+.level-cell.locked .num { color: var(--text-faint); font-size: 14px; }
+
+.level-legend {
+  display: flex; justify-content: center; gap: 18px; flex-wrap: wrap;
+  font-size: 12px; color: var(--text-dim); margin-top: 18px;
+}
+.level-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.level-legend i {
+  width: 12px; height: 12px; border-radius: 3px; background: var(--surface);
+  border: 1px solid var(--border); display: inline-block;
+}
+.level-legend i.solved { border-color: var(--accent); background: var(--accent-soft); }
+.level-legend i.open   { border-color: var(--accent); }
+.level-legend i.locked { opacity: 0.35; }
+
+/* ============================================================
+   SETTINGS
+   ============================================================ */
+.settings-list { display: flex; flex-direction: column; gap: 8px; }
+.settings-row {
+  display: flex; align-items: center; gap: var(--gap);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 18px; min-height: var(--touch);
+}
+.settings-row .label { flex: 1; font-size: 14px; }
+.settings-row button {
+  background: transparent; border: 1px solid var(--border); color: var(--text);
+  padding: 8px 16px; border-radius: var(--radius-sm); cursor: pointer;
+  min-height: 36px; font-size: 13px; font-family: var(--font-body); font-weight: 500;
+  transition: background .15s, border-color .15s;
+}
+.settings-row button:hover { background: var(--surface-2); border-color: var(--accent); }
+.settings-row button.danger { border-color: var(--danger); color: var(--danger); }
+.settings-row button.danger:hover { background: rgba(217,69,69,0.1); }
+
+.toggle {
+  width: 44px; height: 24px; background: var(--surface-2); border-radius: 12px;
+  position: relative; cursor: pointer; border: 1px solid var(--border); flex: 0 0 auto;
+  transition: background .2s, border-color .2s;
+}
+.toggle::after {
+  content: ""; width: 16px; height: 16px; background: var(--text);
+  border-radius: 50%; position: absolute; top: 3px; left: 3px;
+  transition: left .2s, background .2s;
+}
+.toggle.on { background: var(--accent); border-color: var(--accent); }
+.toggle.on::after { left: 23px; background: var(--bg); }
+
+/* ============================================================
+   PARTY
+   ============================================================ */
+.qr-box {
+  width: 220px; height: 220px; background: var(--text); color: #000;
+  border-radius: var(--radius); margin: 16px auto;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-size: 18px; letter-spacing: 0.2em;
+  box-shadow: 0 0 40px var(--accent-glow);
+}
+.party-url {
+  text-align: center; font-family: ui-monospace, Menlo, monospace;
+  color: var(--text-dim); margin: 8px 0 16px; word-break: break-all; font-size: 13px;
+}
+.player-list { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.player-row {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 16px;
+  display: flex; gap: 12px; align-items: center; font-size: 14px;
+}
+.player-dot {
+  width: 10px; height: 10px; border-radius: 50%; background: var(--text-faint); flex: 0 0 auto;
+}
+.player-row.connected .player-dot {
+  background: var(--success); box-shadow: 0 0 8px var(--success);
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.btn-primary {
+  background: var(--accent); color: var(--bg-deep); border: none;
+  padding: 16px 24px; border-radius: var(--radius);
+  font-family: var(--font-display); font-size: 18px; letter-spacing: 0.18em;
+  cursor: pointer; min-height: var(--touch); width: 100%; margin-top: var(--gap);
+  text-transform: uppercase; font-weight: 400;
+  transition: transform .15s, box-shadow .2s, filter .15s;
+}
+.btn-primary:hover { box-shadow: 0 0 32px var(--accent-glow); filter: brightness(1.1); }
+.btn-primary:active { transform: scale(0.98); }
+.btn-primary:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+
+.btn-secondary {
+  background: transparent; color: var(--text); border: 1px solid var(--border);
+  padding: 14px 24px; border-radius: var(--radius); cursor: pointer;
+  min-height: var(--touch); width: 100%; margin-top: 8px;
+  font-family: var(--font-body); font-size: 14px; font-weight: 500;
+  transition: background .15s, border-color .15s;
+}
+.btn-secondary:hover { background: var(--surface); border-color: var(--text-dim); }
+
+/* ============================================================
+   CREDITS
+   ============================================================ */
+.credits-block {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px; margin-bottom: 12px;
+}
+.credits-block h3 {
+  margin: 0 0 12px; font-size: 11px; color: var(--accent);
+  letter-spacing: 0.3em; text-transform: uppercase; font-weight: 600;
+}
+.credits-block p { margin: 6px 0; font-size: 14px; line-height: 1.5; }
+.credits-block p.dim { color: var(--text-dim); font-size: 13px; }
+
+/* ============================================================
+   GAME STUB
+   ============================================================ */
+.game-stub {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--surface); border: 1px dashed var(--border-warm);
+  border-radius: var(--radius); padding: 48px 24px; text-align: center; min-height: 320px;
+  gap: 12px;
+}
+.game-stub h2 {
+  font-family: var(--font-display); font-size: 32px; letter-spacing: 0.15em;
+  color: var(--accent);
+}
+.game-stub p { color: var(--text-dim); margin: 0; }
+
+/* ============================================================
+   HELPER
+   ============================================================ */
+.hint { color: var(--text-dim); font-size: 13px; text-align: center; margin: 8px 0 0; }
+.flow-back { display: inline-flex; align-items: center; gap: 8px; }
+
+/* ============================================================
+   RESPONSIVE TUNING
+   ============================================================ */
+@media (max-width: 480px) {
+  .topbar__title { font-size: 16px; letter-spacing: 0.18em; }
+  .game-card__title { font-size: 26px; }
+  .hero__title { font-size: 36px; }
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ============== 0. GERÄTEAUSWAHL ============== -->
+  <section class="screen active" data-screen="device">
+    <div class="topbar">
+      <div class="topbar__spacer"></div>
+      <div class="topbar__title">Erststart</div>
+      <div class="topbar__spacer"></div>
+    </div>
+    <div class="hero">
+      <div class="hero__eyebrow">Willkommen</div>
+      <h1 class="hero__title">Wie spielst du?</h1>
+      <p class="hero__sub">Damit wir Steuerung und Layout an dein Gerät anpassen können. Du kannst es später jederzeit in den Einstellungen ändern.</p>
+    </div>
+    <div class="device-grid">
+      <button class="device-card" onclick="selectDevice('phone')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="6" y="2" width="12" height="20" rx="2.5"/><line x1="11" y1="18" x2="13" y2="18"/>
+        </svg>
+        <div class="card__title">HANDY</div>
+        <div class="card__sub">Hochformat · Touch</div>
+      </button>
+      <button class="device-card" onclick="selectDevice('tablet')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="3" y="3" width="18" height="18" rx="2.5"/><line x1="11" y1="18" x2="13" y2="18"/>
+        </svg>
+        <div class="card__title">TABLET</div>
+        <div class="card__sub">Quer- oder Hochformat · Touch</div>
+      </button>
+      <button class="device-card" onclick="selectDevice('desktop')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="2" y="4" width="20" height="13" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+        <div class="card__title">DESKTOP</div>
+        <div class="card__sub">Maus + Tastatur (Touch optional)</div>
+      </button>
+    </div>
+  </section>
+
+  <!-- ============== 1. HAUPTMENÜ ============== -->
+  <section class="screen" data-screen="main">
+    <div class="topbar">
+      <div class="topbar__spacer"></div>
+      <button class="btn-icon" onclick="goto('credits')" title="Über">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="17"/><circle cx="12" cy="7.5" r="1" fill="currentColor"/></svg>
+      </button>
+      <button class="btn-icon" onclick="goto('settings')" title="Einstellungen">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+      </button>
+    </div>
+
+    <div class="hero">
+      <div class="hero__eyebrow">Wähle dein Spiel</div>
+      <h1 class="hero__title">Spiele</h1>
+    </div>
+
+    <div class="game-grid">
+      <!-- Schatten-Jäger Karte -->
+      <button class="game-card game-card--shadow" onclick="selectGame('shadow')">
+        <div class="game-card__visual">
+          <svg viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <radialGradient id="sLightG" cx="50%" cy="50%" r="50%">
+                <stop offset="0%"  stop-color="#fff5d6" stop-opacity="1"/>
+                <stop offset="35%" stop-color="#f5c460" stop-opacity="0.85"/>
+                <stop offset="100%" stop-color="#f5c460" stop-opacity="0"/>
+              </radialGradient>
+              <linearGradient id="sShadowG" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%"   stop-color="#000" stop-opacity="0.85"/>
+                <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <!-- Roter Gegner im Schatten (Akzent) -->
+            <circle cx="160" cy="78" r="4" fill="#d94545" opacity="0.85"/>
+            <circle cx="172" cy="58" r="3" fill="#d94545" opacity="0.7"/>
+            <!-- Schattenkegel hinter Säule -->
+            <polygon points="100,70 200,30 200,110" fill="url(#sShadowG)"/>
+            <!-- Säule -->
+            <rect x="94" y="48" width="12" height="44" rx="2" fill="#3a3a48"/>
+            <rect x="94" y="48" width="12" height="6" fill="#4a4a58"/>
+            <!-- Lichtkegel des Spielers -->
+            <circle cx="55" cy="70" r="58" fill="url(#sLightG)"/>
+            <!-- Spielerkern -->
+            <circle class="shadow-light-core" cx="55" cy="70" r="9" fill="#fff5d6"/>
+          </svg>
+        </div>
+        <div class="game-card__body">
+          <div class="game-card__title">SCHATTEN-JÄGER</div>
+          <div class="game-card__sub">Nutze das Licht. Töte im Schatten.</div>
+        </div>
+      </button>
+
+      <!-- Panik-Lauf Karte -->
+      <button class="game-card game-card--panic" onclick="selectGame('panic')">
+        <div class="game-card__visual">
+          <svg viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="pWaterG" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#0e3a4a"/>
+                <stop offset="100%" stop-color="#04141d"/>
+              </linearGradient>
+              <linearGradient id="pWoodG" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"  stop-color="#e09a5b"/>
+                <stop offset="100%" stop-color="#7c4a22"/>
+              </linearGradient>
+              <linearGradient id="pFireG" x1="0" y1="1" x2="0" y2="0">
+                <stop offset="0%"  stop-color="#d94545"/>
+                <stop offset="50%" stop-color="#ff6b35"/>
+                <stop offset="100%" stop-color="#ffd54f"/>
+              </linearGradient>
+            </defs>
+            <!-- Wasser (Kliff-Tiefe) -->
+            <rect x="0" y="92" width="200" height="48" fill="url(#pWaterG)"/>
+            <!-- Wellen-Highlights -->
+            <line x1="20"  y1="110" x2="50"  y2="110" stroke="#1a5a70" stroke-width="1" opacity="0.6"/>
+            <line x1="120" y1="120" x2="160" y2="120" stroke="#1a5a70" stroke-width="1" opacity="0.6"/>
+            <!-- Kliffkante links -->
+            <polygon points="0,80 28,80 28,140 0,140" fill="#1a1812"/>
+            <!-- Steg / Holz -->
+            <rect x="28" y="78" width="172" height="14" fill="url(#pWoodG)"/>
+            <!-- Holzmaserung -->
+            <line x1="28" y1="84" x2="200" y2="84" stroke="#5a3818" stroke-width="0.5" opacity="0.6"/>
+            <line x1="28" y1="89" x2="200" y2="89" stroke="#5a3818" stroke-width="0.4" opacity="0.4"/>
+            <line x1="80" y1="78" x2="80" y2="92" stroke="#5a3818" stroke-width="0.5" opacity="0.5"/>
+            <line x1="130" y1="78" x2="130" y2="92" stroke="#5a3818" stroke-width="0.5" opacity="0.5"/>
+            <line x1="170" y1="78" x2="170" y2="92" stroke="#5a3818" stroke-width="0.5" opacity="0.5"/>
+            <!-- Verbrannter Bereich rechts -->
+            <rect x="150" y="78" width="50" height="14" fill="#1a0a05" opacity="0.7"/>
+            <!-- Feuer (groß) -->
+            <path class="fire-flame" d="M 150 78
+                     Q 145 60 156 55
+                     Q 150 38 165 42
+                     Q 160 22 178 32
+                     Q 175 14 188 28
+                     Q 188 50 180 65
+                     Q 188 75 170 78 Z"
+                  fill="url(#pFireG)"/>
+            <!-- Feuer (innen, hell) -->
+            <path class="fire-flame fire-flame--small" d="M 162 72
+                     Q 160 60 168 58
+                     Q 164 46 175 50
+                     Q 173 36 182 42
+                     Q 182 58 172 72 Z"
+                  fill="#ffd54f" opacity="0.85"/>
+          </svg>
+        </div>
+        <div class="game-card__body">
+          <div class="game-card__title">PANIK-LAUF</div>
+          <div class="game-card__sub">Renne über den Steg, dem Feuer voraus.</div>
+        </div>
+      </button>
+    </div>
+  </section>
+
+  <!-- ============== 2. MODUS ============== -->
+  <section class="screen" data-screen="mode">
+    <div class="topbar">
+      <button class="btn-icon" onclick="goto('main')" title="Zurück">←</button>
+      <div class="topbar__title" id="mode-title">Modus</div>
+      <div class="topbar__spacer"></div>
+    </div>
+    <div class="hero" style="padding: 12px 0 24px;">
+      <div class="hero__eyebrow" id="mode-eyebrow">Spielmodus wählen</div>
+      <h1 class="hero__title" id="mode-game-title" style="font-size: clamp(32px, 6vw, 48px);">SPIEL</h1>
+    </div>
+    <div class="card-grid cols-3" id="mode-grid"></div>
+  </section>
+
+  <!-- ============== 3. LEVELAUSWAHL ============== -->
+  <section class="screen" data-screen="level">
+    <div class="topbar">
+      <button class="btn-icon" onclick="goto('mode')" title="Zurück">←</button>
+      <div class="topbar__title" id="level-title">Level</div>
+      <div class="topbar__spacer"></div>
+    </div>
+    <div class="section-title" id="level-subtitle">Level wählen</div>
+    <div class="level-grid" id="level-grid"></div>
+    <div class="level-legend">
+      <span><i class="solved"></i> gelöst</span>
+      <span><i class="open"></i> offen</span>
+      <span><i class="locked"></i> gesperrt</span>
+    </div>
+  </section>
+
+  <!-- ============== 4. PARTY-LOBBY ============== -->
+  <section class="screen" data-screen="party">
+    <div class="topbar">
+      <button class="btn-icon" onclick="goto('level')" title="Zurück">←</button>
+      <div class="topbar__title">Party-Lobby</div>
+      <div class="topbar__spacer"></div>
+    </div>
+    <p class="hint">Andere Spieler scannen den Code mit dem Handy, um beizutreten.</p>
+    <div class="qr-box">QR-CODE</div>
+    <div class="party-url">https://schatten-jaeger.de/p/AB7K-9X</div>
+    <div class="section-title">Spieler</div>
+    <div class="player-list">
+      <div class="player-row connected"><div class="player-dot"></div>Spieler 1 — Host (du)</div>
+      <div class="player-row"><div class="player-dot"></div>Spieler 2 — wartet …</div>
+      <div class="player-row"><div class="player-dot"></div>Spieler 3 — wartet …</div>
+    </div>
+    <button class="btn-primary" onclick="goto('game')">Spiel starten</button>
+    <button class="btn-secondary" onclick="goto('mode')">Lobby verlassen</button>
+  </section>
+
+  <!-- ============== 5. EINSTELLUNGEN ============== -->
+  <section class="screen" data-screen="settings">
+    <div class="topbar">
+      <button class="btn-icon" onclick="goBack()" title="Zurück">←</button>
+      <div class="topbar__title">Einstellungen</div>
+      <div class="topbar__spacer"></div>
+    </div>
+    <div class="settings-list">
+      <div class="settings-row">
+        <div class="label">Audio</div>
+        <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div class="settings-row">
+        <div class="label">Erschütterung (Screen Shake)</div>
+        <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div class="settings-row">
+        <div class="label">Reduzierte Bewegung</div>
+        <div class="toggle" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div class="settings-row">
+        <div class="label">Gerät</div>
+        <button onclick="goto('device')">Ändern</button>
+      </div>
+      <div class="settings-row">
+        <div class="label">Fortschritt zurücksetzen</div>
+        <button class="danger" onclick="alert('Mockup: würde Fortschritt löschen.')">Reset</button>
+      </div>
+      <div class="settings-row">
+        <div class="label">Impressum</div>
+        <button onclick="alert('Platzhalter: Impressum.')">Anzeigen</button>
+      </div>
+      <div class="settings-row">
+        <div class="label">Datenschutz</div>
+        <button onclick="alert('Platzhalter: Datenschutzerklärung.')">Anzeigen</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== 6. ÜBER / CREDITS ============== -->
+  <section class="screen" data-screen="credits">
+    <div class="topbar">
+      <button class="btn-icon" onclick="goBack()" title="Zurück">←</button>
+      <div class="topbar__title">Über</div>
+      <div class="topbar__spacer"></div>
+    </div>
+    <div class="credits-block">
+      <h3>Version</h3>
+      <p>0.9.0 — Design-Mockup</p>
+    </div>
+    <div class="credits-block">
+      <h3>Spiel</h3>
+      <p>Schatten-Jäger &amp; Panik-Lauf</p>
+      <p class="dim">Ein HTML5-Spiel über Licht, Schatten und Panik.</p>
+    </div>
+    <div class="credits-block">
+      <h3>Mitwirkende</h3>
+      <p>Bernd Button — Spieldesign &amp; Entwicklung</p>
+      <p class="dim">Mit Unterstützung durch Claude Code.</p>
+    </div>
+    <div class="credits-block">
+      <h3>Danksagung</h3>
+      <p class="dim">An alle Testspieler und Familienmitglieder, die mitgespielt und mitgefiebert haben.</p>
+    </div>
+    <div class="credits-block">
+      <h3>Rechtliches</h3>
+      <p class="dim">Impressum und Datenschutzerklärung findest du in den Einstellungen.</p>
+    </div>
+  </section>
+
+  <!-- ============== 7. SPIEL-PLATZHALTER ============== -->
+  <section class="screen" data-screen="game">
+    <div class="topbar">
+      <button class="btn-icon" onclick="goto('main')" title="Menü">←</button>
+      <div class="topbar__title" id="game-title">Spiel</div>
+      <div class="topbar__spacer"></div>
+    </div>
+    <div class="game-stub">
+      <h2>Hier startet das Spiel</h2>
+      <p id="game-info">Platzhalter für die Spielszene.</p>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ============================================================
+   Mockup-Logik
+   ============================================================ */
+const app = document.getElementById('app');
+const state = { device: null, game: null, mode: null, prevScreen: 'main' };
+
+const GAME_NAMES = { shadow: 'Schatten-Jäger', panic: 'Panik-Lauf' };
+
+const MODES = {
+  shadow: [
+    { id: 'solo',      name: 'SOLO',       sub: 'Du bist das Licht.' },
+    { id: 'koop',      name: 'KOOP',       sub: '2 Spieler · geteilte Kontrolle' },
+    { id: 'ring-solo', name: 'RING-SOLO',  sub: '1 Spieler im Ring' },
+    { id: 'ring-duo',  name: 'RING-DUO',   sub: '2 Spieler im Ring' },
+    { id: 'ring-trio', name: 'RING-TRIO',  sub: '3 Spieler im Ring' },
+    { id: 'party',     name: 'PARTY',      sub: 'Mit Handys verbinden', featured: true },
+    { id: 'training',  name: 'TRAINING',   sub: 'Üben ohne Druck' }
+  ],
+  panic: [
+    { id: 'ring-solo', name: 'RING-SOLO',  sub: '1 Spieler im Ring' },
+    { id: 'ring-duo',  name: 'RING-DUO',   sub: '2 Spieler im Ring' },
+    { id: 'ring-trio', name: 'RING-TRIO',  sub: '3 Spieler im Ring' },
+    { id: 'party',     name: 'PARTY',      sub: 'Mit Handys verbinden', featured: true },
+    { id: 'training',  name: 'TRAINING',   sub: 'Üben ohne Druck' }
+  ]
+};
+
+/* Mock-Daten:
+   - Score-Level (Punkte): Bestzeit ("12.4 s")
+   - Pazifist-Level: wenigste Punkte ("3 P")
+   - Survival-Level: erreichte Punkte ("470 P") */
+function buildLevels() {
+  const out = [];
+  for (let i = 1; i <= 50; i++) {
+    let status = 'locked', best = null;
+    if (i <= 14) {
+      status = 'solved';
+      const kind = i % 3;
+      if (kind === 0)      best = (8 + Math.random() * 30).toFixed(1) + ' s';
+      else if (kind === 1) best = Math.floor(Math.random() * 6) + ' P';
+      else                 best = (200 + Math.floor(Math.random() * 600)) + ' P';
+    } else if (i === 15) status = 'open';
+    out.push({ num: i, status, best });
+  }
+  return out;
+}
+
+/* Navigation */
+function goto(screen) {
+  const cur = document.querySelector('.screen.active');
+  if (cur && cur.dataset.screen !== screen) state.prevScreen = cur.dataset.screen;
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelector(`[data-screen="${screen}"]`).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+function goBack() { goto(state.prevScreen || 'main'); }
+
+/* Auswahlhandler */
+function selectDevice(d) { state.device = d; goto('main'); }
+
+function selectGame(g) {
+  state.game = g;
+  app.dataset.theme = g;
+  document.getElementById('mode-title').textContent = GAME_NAMES[g];
+  document.getElementById('mode-game-title').textContent = GAME_NAMES[g];
+  renderModes(g);
+  goto('mode');
+}
+
+function selectMode(m) {
+  state.mode = m;
+  document.getElementById('level-title').textContent =
+    `${GAME_NAMES[state.game]} · ${m.toUpperCase()}`;
+  renderLevels();
+  goto('level');
+}
+
+function selectLevel(num) {
+  if (state.mode === 'party') {
+    goto('party');
+  } else {
+    document.getElementById('game-title').textContent = `Level ${num}`;
+    document.getElementById('game-info').textContent =
+      `${GAME_NAMES[state.game]} · ${state.mode.toUpperCase()} · Level ${num}`;
+    goto('game');
+  }
+}
+
+/* Renderer */
+function renderModes(game) {
+  const grid = document.getElementById('mode-grid');
+  grid.innerHTML = '';
+  MODES[game].forEach(m => {
+    const btn = document.createElement('button');
+    btn.className = 'card' + (m.featured ? ' card--featured' : '');
+    btn.innerHTML = `<div class="card__title">${m.name}</div><div class="card__sub">${m.sub}</div>`;
+    btn.onclick = () => selectMode(m.id);
+    grid.appendChild(btn);
+  });
+}
+
+function renderLevels() {
+  const grid = document.getElementById('level-grid');
+  grid.innerHTML = '';
+  buildLevels().forEach(lvl => {
+    const cell = document.createElement('button');
+    cell.className = `level-cell ${lvl.status}`;
+    cell.innerHTML = lvl.status === 'locked'
+      ? `<div class="num">🔒</div>`
+      : `<div class="num">${lvl.num}</div>${lvl.best ? `<div class="best">${lvl.best}</div>` : ''}`;
+    if (lvl.status !== 'locked') cell.onclick = () => selectLevel(lvl.num);
+    grid.appendChild(cell);
+  });
+}
+</script>
+</body>
+</html>

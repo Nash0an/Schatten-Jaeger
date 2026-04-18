@@ -1,52 +1,48 @@
 # Quick Context
 
 ## Projekt in einem Satz
-`Schatten-Jäger` ist aktuell ein Canvas-Spiel mit klassischem Hauptspiel, Ring-Modi und einem ersten spielbaren Labyrinth-Parkourzweig.
+`Schatten-Jäger` ist ein Canvas-Spiel mit klassischem Hauptspiel, Ring-Modi und dem Parkour-Zweig `Panik-Lauf`, unter einem neuen 3-Schritt-Menü mit Per-Game-Theming.
 
 ## Gerade wichtig
-- Klassisches Hauptspiel soll stabil bleiben.
-- Labyrinth ist jetzt nicht mehr nur Menü, sondern bereits spielbar.
-- Mobile Gameplay ist jetzt Portrait-first; Labyrinth wird auf Handys runtime-seitig gedreht und neu eingerahmt.
-- Party-Modus ist technisch als `COOP`-Host/Join v1 vorhanden, braucht aber noch echtes Mobile-Playtesting und UX-Polish.
-- Für die Arbeitsaufnahme nach einer Pause ist `docs/DEV_HANDOFF.md` die wichtigste Datei.
+- **Neues Menü-System (V2.7.0):** Gerät → Spiel → Modus → Level, plus Einstellungen und Credits.
+- `game.js` wurde nicht angefasst; versteckte Kompatibilitäts-Stubs in `index.html` halten die alten DOM-Hooks am Leben.
+- Theming läuft über `#app-shell[data-theme="shadow"|"panic"]`.
+- Klassisches Hauptspiel und Panik-Lauf bleiben spielbar und stabil.
+- Mobile Gameplay (Portrait, Rotate-Overlay, Labyrinth-Laufzeitrotation) funktioniert weiter.
+- Party-Modus v1 ist als `COOP`-Host/Join vorhanden, braucht weiter echtes Mobile-Playtesting.
 
 ## Was zuletzt eingebaut wurde
-- Mobile Portrait-Modus mit Rotate-Overlay
-- Touch-Fix fuer Ring/Labyrinth, damit der erste Stick-Kontakt direkt zaehlt
-- Laufzeit-Rotation fuer mobile Labyrinth-Pfade
-- QR-Party-Lobby mit Join-Warteraum, Rollenvergabe und Countdown fuer `COOP`
-- Labyrinth-Modi:
-  - `LABYRINTH_RING_SOLO`
-  - `LABYRINTH_RING_DUO`
-  - `LABYRINTH_RING_TRIO`
-- Eigene Labyrinth-Levelauswahl
-- 50 generierte Labyrinth-Level
-- Parkour-Update-/Render-Logik
-- Getrennte Labyrinth-Bestzeiten
-- Start-Countdown `3, 2, 1, LOS`, wobei Bewegung und Zeit bei `LOS` beginnen
+- 3-Schritt-Menü mit Spielkarten, SVG-Logos (Licht-Puls / Feuerflackern) und animierten Übergängen
+- Per-Game-Theming, Bebas Neue + Inter als Standardschriften
+- `MenuFlow`-Controller in `index.html` mit Back-Buttons, Gerätewahl, Settings, Credits
+- Komplette Neufassung der `styles.css` nach dem Design-System
+- Level-Grid-Rendering bleibt an `game.js` gekoppelt, aber über neue `.lvl-btn`-Styles
 
 ## Wo man zuerst schaut
-- Menü/Modi: `setMode()`, `setMenuTab()`, `refreshModeSelection()`
+- Menü-UI: `MenuFlow` am Ende von `index.html`
+- Menü-Styles: `styles.css` (Suche nach `.menu-screen`, `.game-card`, `.card`, `.lvl-btn`)
+- Spiel-Modi-Integration: `setMode()`, `startLevel()`, `renderLevelSelect()` in `game.js`
 - Mobile Runtime: `updateViewportMode()`, `getGameplayFrame()`, `configureTouchControls()`
 - Party-Flow: `startPartyLobby()`, `showPartyOverlay()`, `handleControllerMessage()`, `updateController()`
-- Levelauswahl: `updateLevelSelect()`, `renderLevelSelect()`
-- Labyrinth-Setup: `setupLabyrinthRun()`
-- Labyrinth-Loop: `updateLabyrinth()`
-- Labyrinth-Render: `drawLabyrinth()`
+- Panik-Lauf-Setup: `setupLabyrinthRun()`
+- Panik-Lauf-Loop: `updateLabyrinth()`
+- Panik-Lauf-Render: `drawLabyrinth()`
 - Ring-Physik: `updateRingForce()`
 
 ## Nächster sinnvoller Arbeitsschritt
-- Mobile auf echtem Handy gegen Desktop gegenprüfen
-- Party-Modus mit zwei echten Geraeten im WLAN testen
-- danach erst Zeitlimits fuer `LABYRINTH_RING_SOLO` und spaeter `DUO`/`TRIO` feinziehen
+- Party aus dem Panik-Lauf-Menü auf den Labyrinth-Zweig routen
+- Einstellungs-Toggles (Audio, Shake, Reduzierte Bewegung) persistieren und auf das Spiel anwenden
+- Level-Grid: expliziten Locked-Zustand rendern
+- Pause-Menü und In-Game-HUD ins neue Design-System überführen
 
 ## Wenn du morgen neu einsteigst
 1. `docs/DEV_HANDOFF.md` lesen
-2. `docs/MULTIPLAYER_CONCEPT.md` lesen
-3. `docs/LABYRINTH_PREP.md` lesen
-4. dann erst `game.js` und `levels.js` öffnen
+2. `docs/ARCHITECTURE.md` (Abschnitt „Menü V2.7.0")
+3. `DESIGN-REGELN.md` überfliegen
+4. dann erst `index.html`, `styles.css`, `game.js`, `levels.js`
 
 ## Wichtige Save-Daten
 - `saveData.bests`: klassisches Hauptspiel
-- `saveData.labyrinthBests`: Labyrinth
+- `saveData.labyrinthBests`: Panik-Lauf
 - `masterModeActive`: nur temporär
+- `sj_device` (LocalStorage-Key): Gerätepräferenz Desktop/Mobile

@@ -2,6 +2,27 @@
 
 Alle relevanten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [2.7.0] - 2026-04-18
+### Hinzugefügt
+- **Neues Menü-System (3-Schritt):** Gerätewahl → Spielwahl → Modus → Level. Dazu eigene Screens für Einstellungen und Credits.
+- **Zwei Spielkarten:** `Schatten-Jäger` (Solo/Koop/Ring×3/Party/Training) und `Panik-Lauf` (Ring×3/Party/Training), mit animierten Inline-SVG-Logos (Licht-Puls bzw. Feuerflackern).
+- **Per-Game-Theming:** Farb-Tokens über `#app-shell[data-theme="shadow"|"panic"]` — Bernstein für Schatten-Jäger, Honig/Holz für Panik-Lauf.
+- **MenuFlow-Controller:** Zentrale Navigationslogik in `index.html` (show/back/selectGame/selectMode/startParty/startTraining) mit Back-Button pro Screen.
+- **Design-System:** Bebas Neue (Display) + Inter (Body) als Standard-Schriften, CSS-Tokens für Abstände, Radien und Touch-Größen.
+- **Gerätepräferenz:** Auswahl Desktop/Mobile wird in `localStorage` unter `sj_device` gespeichert.
+
+### Geändert
+- **`index.html` komplett neu strukturiert** um das 3-Schritt-Menü; bisherige `panel-classic` und `panel-labyrinth` bleiben als versteckte Kompatibilitätshülle für `game.js` erhalten.
+- **`styles.css` komplett neu geschrieben** nach dem Design-System: Topbar, Hero, Game-Cards, Mode-Cards, Device-Cards, Level-Grid (5/7/10-Spalten responsiv), Settings-Liste, Party-/Join-/Rotate-Panels, Win/Lose-Result-Panels, HUD und Joysticks.
+- **Level-Grid** nutzt die von `game.js` gesetzten Klassen (`.lvl-btn.completed`, `.lvl-btn.current-target`) und markiert Bestwerte mit dezenter `.best`-Zeile.
+- **Overlay-Hintergrund** wird vom Menü-Code nicht mehr auf die Overlay-Box gezwungen; die neuen Screens haben ein eigenes Gradient-Backdrop.
+
+### Offen
+- `Party` aus dem Panik-Lauf-Menü startet aktuell die klassische Schatten-Jäger-COOP-Strecke.
+- Einstellungs-Toggles (Audio, Screen-Shake, Reduzierte Bewegung) sind noch reine UI ohne Persistenz.
+- Im Level-Grid gibt es noch keinen expliziten Locked-Zustand; `game.js` rendert alle Level anwählbar.
+- Pause-Menü und HUD-Feinschliff im Spielbildschirm stehen noch aus.
+
 ## [2.6.0] - 2026-04-17
 ### Hinzugefügt
 - **Dynamisches Hintergrund-System:** Unterstützung für modus-spezifische Hintergründe (Schattenjäger vs. Labyrinth).

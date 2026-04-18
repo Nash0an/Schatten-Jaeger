@@ -30,10 +30,17 @@ Pure HTML5/Canvas/Web Audio project with no dependencies and no build tooling.
 
 ### Core Files
 
-- [index.html](index.html): Canvas element, HUD, menu/win/lose overlays, touch joystick containers. Scripts are included at the bottom.
+- [index.html](index.html): Canvas element, HUD, the new 3-step menu (device → game → mode → level, plus settings and credits screens), win/lose overlays, party/join/rotate panels, touch joystick containers, and the `MenuFlow` controller script at the bottom.
 - [game.js](game.js): The entire game engine as a single `SchattenJaeger` class (instantiated once on DOMContentLoaded). Contains the state machine, input handling, rendering, audio synthesis, physics, enemy AI, combo system, and localStorage persistence.
-- [levels.js](levels.js): A single exported global `LEVELS` array of 50 level config objects.
-- [styles.css](styles.css): Dark theme, HUD layout, menus, touch joystick styling.
+- [levels.js](levels.js): Two exported globals: `LEVELS` (classic) and `LABYRINTH_LEVELS` (Panik-Lauf), 50 configs each.
+- [styles.css](styles.css): Full design system — CSS tokens, per-game theming (`#app-shell[data-theme]`), screen transitions, HUD layout, menus, touch joystick styling.
+- [DESIGN-REGELN.md](DESIGN-REGELN.md): Visual and interaction guidelines the menu/design system follows.
+
+### Menu Layer
+
+The menu lives in [index.html](index.html) as a set of `.menu-screen` sections driven by `MenuFlow`. Flow: device → main → mode-{shadow,panic} → level-{shadow,panic}, with separate `settings` and `credits` screens. `MenuFlow.selectGame(g)` sets `#app-shell[data-theme]` to `shadow` or `panic`, which swaps the accent color palette in `styles.css`.
+
+**Compatibility shim:** `game.js` is untouched. The old `#panel-classic`, `#panel-labyrinth`, `#tab-classic`, `#tab-labyrinth` and `#audio-init-btn` elements are kept as hidden stubs so `game.js` queries still resolve. Level buttons rendered by `game.js` (`.lvl-btn.completed`, `.lvl-btn.current-target`, child `span.best`) are styled by the new system.
 
 ### State Machine
 

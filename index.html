@@ -2,14 +2,17 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Schatten-Jäger - Professional Web Edition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Schatten-Jäger</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div id="game-container">
         <canvas id="gameCanvas"></canvas>
-        
+
         <div id="hud" class="hidden">
             <div class="hud-item" id="hud-level">Level: 1</div>
             <div class="hud-item" id="hud-target">Ziel: 50 Pkt</div>
@@ -26,166 +29,521 @@
             <div class="joystick-thumb"></div>
         </div>
 
+        <!-- ============ HAUPTMENÜ ============ -->
         <div id="menu-overlay" class="overlay">
-            <div class="ui-panel menu-panel">
-                <div id="panel-classic" class="menu-tab-panel active">
-                    <div class="menu-screen-head">
-                        <div>
-                            <h1 class="title-main">SCHATTEN-JÄGER</h1>
-                            <p class="text-small">Nutze das Licht, um Feinde im Schatten zu vernichten.</p>
-                        </div>
-                        <button id="tab-labyrinth" class="menu-switch-btn" type="button">LABYRINTH</button>
+            <div class="app-shell" id="app-shell">
+
+                <!-- 0. Geräteauswahl -->
+                <section class="menu-screen" data-screen="device">
+                    <div class="topbar">
+                        <div class="topbar__spacer"></div>
+                        <div class="topbar__title">Erststart</div>
+                        <div class="topbar__spacer"></div>
                     </div>
+                    <div class="hero">
+                        <div class="hero__eyebrow">Willkommen</div>
+                        <h1 class="hero__title">Wie spielst du?</h1>
+                        <p class="hero__sub">Damit wir Steuerung und Layout passend einstellen. Du kannst es später jederzeit in den Einstellungen ändern.</p>
+                    </div>
+                    <div class="device-grid">
+                        <button class="device-card" type="button" onclick="MenuFlow.selectDevice('phone')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="6" y="2" width="12" height="20" rx="2.5"/>
+                                <line x1="11" y1="18" x2="13" y2="18"/>
+                            </svg>
+                            <div class="card__title">HANDY</div>
+                            <div class="card__sub">Hochformat · Touch</div>
+                        </button>
+                        <button class="device-card" type="button" onclick="MenuFlow.selectDevice('tablet')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="3" y="3" width="18" height="18" rx="2.5"/>
+                                <line x1="11" y1="18" x2="13" y2="18"/>
+                            </svg>
+                            <div class="card__title">TABLET</div>
+                            <div class="card__sub">Quer- oder Hochformat · Touch</div>
+                        </button>
+                        <button class="device-card" type="button" onclick="MenuFlow.selectDevice('desktop')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="2" y="4" width="20" height="13" rx="2"/>
+                                <line x1="8" y1="21" x2="16" y2="21"/>
+                                <line x1="12" y1="17" x2="12" y2="21"/>
+                            </svg>
+                            <div class="card__title">DESKTOP</div>
+                            <div class="card__sub">Maus + Tastatur (Touch optional)</div>
+                        </button>
+                    </div>
+                </section>
 
-                    <div class="mode-group">
-                        <div class="mode-selection mode-selection-main">
-                            <button id="mode-solo" class="mode-card selected" type="button" onclick="game.setMode('SOLO')">
-                                <h3 class="margin-v-10">SOLO</h3>
-                                <p class="controls-hint">Du bist das Licht.<br>WASD / Pfeile</p>
-                            </button>
-                            <button id="mode-coop" class="mode-card" type="button" onclick="game.setMode('COOP')">
-                                <h3 class="margin-v-10">KOOP</h3>
-                                <p class="controls-hint">P1: WASD (Laufen)<br>P2: Pfeile (Licht)</p>
-                            </button>
+                <!-- 1. Hauptmenü / Spielwahl -->
+                <section class="menu-screen" data-screen="main">
+                    <div class="topbar">
+                        <div class="topbar__spacer"></div>
+                        <button class="btn-icon" type="button" onclick="MenuFlow.show('credits')" title="Über">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="17"/><circle cx="12" cy="7.5" r="1" fill="currentColor"/></svg>
+                        </button>
+                        <button class="btn-icon" type="button" onclick="MenuFlow.show('settings')" title="Einstellungen">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+                        </button>
+                    </div>
+                    <div class="hero">
+                        <div class="hero__eyebrow">Wähle dein Spiel</div>
+                        <h1 class="hero__title">Spiele</h1>
+                    </div>
+                    <div class="game-grid">
+                        <button class="game-card game-card--shadow" type="button" onclick="MenuFlow.selectGame('shadow')">
+                            <div class="game-card__visual">
+                                <svg viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+                                    <defs>
+                                        <radialGradient id="sLightG" cx="50%" cy="50%" r="50%">
+                                            <stop offset="0%"  stop-color="#fff5d6" stop-opacity="1"/>
+                                            <stop offset="35%" stop-color="#f5c460" stop-opacity="0.85"/>
+                                            <stop offset="100%" stop-color="#f5c460" stop-opacity="0"/>
+                                        </radialGradient>
+                                        <linearGradient id="sShadowG" x1="0" y1="0" x2="1" y2="0">
+                                            <stop offset="0%" stop-color="#000" stop-opacity="0.85"/>
+                                            <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <circle cx="160" cy="78" r="4" fill="#d94545" opacity="0.85"/>
+                                    <circle cx="172" cy="58" r="3" fill="#d94545" opacity="0.7"/>
+                                    <polygon points="100,70 200,30 200,110" fill="url(#sShadowG)"/>
+                                    <rect x="94" y="48" width="12" height="44" rx="2" fill="#3a3a48"/>
+                                    <rect x="94" y="48" width="12" height="6" fill="#4a4a58"/>
+                                    <circle cx="55" cy="70" r="58" fill="url(#sLightG)"/>
+                                    <circle class="shadow-light-core" cx="55" cy="70" r="9" fill="#fff5d6"/>
+                                </svg>
+                            </div>
+                            <div class="game-card__body">
+                                <div class="game-card__title">SCHATTEN-JÄGER</div>
+                                <div class="game-card__sub">Nutze das Licht. Töte im Schatten.</div>
+                            </div>
+                        </button>
+
+                        <button class="game-card game-card--panic" type="button" onclick="MenuFlow.selectGame('panic')">
+                            <div class="game-card__visual">
+                                <svg viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+                                    <defs>
+                                        <linearGradient id="pWaterG" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stop-color="#0e3a4a"/>
+                                            <stop offset="100%" stop-color="#04141d"/>
+                                        </linearGradient>
+                                        <linearGradient id="pWoodG" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%"  stop-color="#e09a5b"/>
+                                            <stop offset="100%" stop-color="#7c4a22"/>
+                                        </linearGradient>
+                                        <linearGradient id="pFireG" x1="0" y1="1" x2="0" y2="0">
+                                            <stop offset="0%"  stop-color="#d94545"/>
+                                            <stop offset="50%" stop-color="#ff6b35"/>
+                                            <stop offset="100%" stop-color="#ffd54f"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <rect x="0" y="92" width="200" height="48" fill="url(#pWaterG)"/>
+                                    <line x1="20" y1="110" x2="50" y2="110" stroke="#1a5a70" stroke-width="1" opacity="0.6"/>
+                                    <line x1="120" y1="120" x2="160" y2="120" stroke="#1a5a70" stroke-width="1" opacity="0.6"/>
+                                    <polygon points="0,80 28,80 28,140 0,140" fill="#1a1812"/>
+                                    <rect x="28" y="78" width="172" height="14" fill="url(#pWoodG)"/>
+                                    <line x1="28" y1="84" x2="200" y2="84" stroke="#5a3818" stroke-width="0.5" opacity="0.6"/>
+                                    <line x1="28" y1="89" x2="200" y2="89" stroke="#5a3818" stroke-width="0.4" opacity="0.4"/>
+                                    <line x1="80" y1="78" x2="80" y2="92" stroke="#5a3818" stroke-width="0.5" opacity="0.5"/>
+                                    <line x1="130" y1="78" x2="130" y2="92" stroke="#5a3818" stroke-width="0.5" opacity="0.5"/>
+                                    <line x1="170" y1="78" x2="170" y2="92" stroke="#5a3818" stroke-width="0.5" opacity="0.5"/>
+                                    <rect x="150" y="78" width="50" height="14" fill="#1a0a05" opacity="0.7"/>
+                                    <path class="fire-flame" d="M 150 78 Q 145 60 156 55 Q 150 38 165 42 Q 160 22 178 32 Q 175 14 188 28 Q 188 50 180 65 Q 188 75 170 78 Z" fill="url(#pFireG)"/>
+                                    <path class="fire-flame fire-flame--small" d="M 162 72 Q 160 60 168 58 Q 164 46 175 50 Q 173 36 182 42 Q 182 58 172 72 Z" fill="#ffd54f" opacity="0.85"/>
+                                </svg>
+                            </div>
+                            <div class="game-card__body">
+                                <div class="game-card__title">PANIK-LAUF</div>
+                                <div class="game-card__sub">Renne über den Steg, dem Feuer voraus.</div>
+                            </div>
+                        </button>
+                    </div>
+                </section>
+
+                <!-- 2a. Modus Schatten-Jäger -->
+                <section class="menu-screen" data-screen="mode-shadow">
+                    <div class="topbar">
+                        <button class="btn-icon" type="button" onclick="MenuFlow.show('main')" title="Zurück">←</button>
+                        <div class="topbar__title">Schatten-Jäger</div>
+                        <div class="topbar__spacer"></div>
+                    </div>
+                    <div class="hero hero--compact">
+                        <div class="hero__eyebrow">Spielmodus</div>
+                        <h1 class="hero__title hero__title--small">Schatten-Jäger</h1>
+                    </div>
+                    <div class="card-grid cols-3">
+                        <button id="mode-solo" class="card mode-card" type="button" onclick="MenuFlow.selectMode('SOLO')">
+                            <div class="card__title">SOLO</div>
+                            <div class="card__sub">Du bist das Licht.</div>
+                        </button>
+                        <button id="mode-coop" class="card mode-card" type="button" onclick="MenuFlow.selectMode('COOP')">
+                            <div class="card__title">KOOP</div>
+                            <div class="card__sub">2 Spieler · geteilte Kontrolle</div>
+                        </button>
+                        <button id="mode-ring-solo" class="card mode-card" type="button" onclick="MenuFlow.selectMode('RING_SOLO')">
+                            <div class="card__title">RING-SOLO</div>
+                            <div class="card__sub">1 Spieler im Ring</div>
+                        </button>
+                        <button id="mode-ring-duo" class="card mode-card" type="button" onclick="MenuFlow.selectMode('RING_DUO')">
+                            <div class="card__title">RING-DUO</div>
+                            <div class="card__sub">2 Spieler im Ring</div>
+                        </button>
+                        <button id="mode-ring-trio" class="card mode-card" type="button" onclick="MenuFlow.selectMode('RING_TRIO')">
+                            <div class="card__title">RING-TRIO</div>
+                            <div class="card__sub">3 Spieler im Ring</div>
+                        </button>
+                        <button class="card card--featured" type="button" onclick="MenuFlow.startParty()">
+                            <div class="card__title">PARTY</div>
+                            <div class="card__sub">Mit Handys verbinden</div>
+                        </button>
+                        <button id="ring-force-btn" class="card" type="button" onclick="MenuFlow.startTraining()">
+                            <div class="card__title">TRAINING</div>
+                            <div class="card__sub">Üben ohne Druck</div>
+                        </button>
+                    </div>
+                </section>
+
+                <!-- 2b. Modus Panik-Lauf -->
+                <section class="menu-screen" data-screen="mode-panic">
+                    <div class="topbar">
+                        <button class="btn-icon" type="button" onclick="MenuFlow.show('main')" title="Zurück">←</button>
+                        <div class="topbar__title">Panik-Lauf</div>
+                        <div class="topbar__spacer"></div>
+                    </div>
+                    <div class="hero hero--compact">
+                        <div class="hero__eyebrow">Spielmodus</div>
+                        <h1 class="hero__title hero__title--small">Panik-Lauf</h1>
+                    </div>
+                    <div class="card-grid cols-3">
+                        <button id="mode-lab-solo" class="card mode-card" type="button" onclick="MenuFlow.selectMode('LABYRINTH_RING_SOLO')">
+                            <div class="card__title">RING-SOLO</div>
+                            <div class="card__sub">1 Spieler im Ring</div>
+                        </button>
+                        <button id="mode-lab-duo" class="card mode-card" type="button" onclick="MenuFlow.selectMode('LABYRINTH_RING_DUO')">
+                            <div class="card__title">RING-DUO</div>
+                            <div class="card__sub">2 Spieler im Ring</div>
+                        </button>
+                        <button id="mode-lab-trio" class="card mode-card" type="button" onclick="MenuFlow.selectMode('LABYRINTH_RING_TRIO')">
+                            <div class="card__title">RING-TRIO</div>
+                            <div class="card__sub">3 Spieler im Ring</div>
+                        </button>
+                        <button class="card card--featured" type="button" onclick="MenuFlow.startParty()">
+                            <div class="card__title">PARTY</div>
+                            <div class="card__sub">Mit Handys verbinden</div>
+                        </button>
+                        <button class="card" type="button" onclick="MenuFlow.startTraining()">
+                            <div class="card__title">TRAINING</div>
+                            <div class="card__sub">Üben ohne Druck</div>
+                        </button>
+                    </div>
+                </section>
+
+                <!-- 3a. Levels Schatten-Jäger -->
+                <section class="menu-screen" data-screen="level-shadow">
+                    <div class="topbar">
+                        <button class="btn-icon" type="button" onclick="MenuFlow.show('mode-shadow')" title="Zurück">←</button>
+                        <div class="topbar__title">Schatten-Jäger</div>
+                        <div class="topbar__spacer"></div>
+                    </div>
+                    <div class="section-title">Level wählen</div>
+                    <div id="level-select" class="level-grid"></div>
+                    <div class="level-legend">
+                        <span><i class="solved"></i> gelöst</span>
+                        <span><i class="open"></i> aktuell</span>
+                        <span><i class="locked"></i> gesperrt</span>
+                    </div>
+                </section>
+
+                <!-- 3b. Levels Panik-Lauf -->
+                <section class="menu-screen" data-screen="level-panic">
+                    <div class="topbar">
+                        <button class="btn-icon" type="button" onclick="MenuFlow.show('mode-panic')" title="Zurück">←</button>
+                        <div class="topbar__title">Panik-Lauf</div>
+                        <div class="topbar__spacer"></div>
+                    </div>
+                    <div class="section-title">Level wählen</div>
+                    <div id="labyrinth-level-select" class="level-grid"></div>
+                    <div class="level-legend">
+                        <span><i class="solved"></i> gelöst</span>
+                        <span><i class="open"></i> aktuell</span>
+                        <span><i class="locked"></i> gesperrt</span>
+                    </div>
+                </section>
+
+                <!-- Einstellungen -->
+                <section class="menu-screen" data-screen="settings">
+                    <div class="topbar">
+                        <button class="btn-icon" type="button" onclick="MenuFlow.back()" title="Zurück">←</button>
+                        <div class="topbar__title">Einstellungen</div>
+                        <div class="topbar__spacer"></div>
+                    </div>
+                    <div class="settings-list">
+                        <div class="settings-row">
+                            <div class="label">Audio</div>
+                            <div class="toggle on" onclick="MenuFlow.toggleSetting(this, 'audio')"></div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="label">Erschütterung (Screen Shake)</div>
+                            <div class="toggle on" onclick="MenuFlow.toggleSetting(this, 'shake')"></div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="label">Reduzierte Bewegung</div>
+                            <div class="toggle" onclick="MenuFlow.toggleSetting(this, 'reduceMotion')"></div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="label">Gerät</div>
+                            <button type="button" onclick="MenuFlow.show('device')">Ändern</button>
+                        </div>
+                        <div class="settings-row">
+                            <div class="label">Fortschritt zurücksetzen</div>
+                            <button id="reset-progress-btn" class="danger" type="button" onclick="game.resetProgress()">Reset</button>
+                        </div>
+                        <div class="settings-row">
+                            <div class="label">Impressum</div>
+                            <button type="button" onclick="alert('Platzhalter: Impressum.')">Anzeigen</button>
+                        </div>
+                        <div class="settings-row">
+                            <div class="label">Datenschutz</div>
+                            <button type="button" onclick="alert('Platzhalter: Datenschutzerklärung.')">Anzeigen</button>
                         </div>
                     </div>
+                </section>
 
-                    <h3 class="title-sub mode-group-title">RINGS</h3>
-                    <div class="mode-group">
-                        <div class="mode-selection">
-                            <button id="mode-ring-solo" class="mode-card" type="button" onclick="game.setMode('RING_SOLO')">
-                                <h3 class="margin-v-10">SOLO</h3>
-                                <p class="controls-hint">P1: WASD<br>1 Spieler im Ring</p>
-                            </button>
-                            <button id="mode-ring-duo" class="mode-card" type="button" onclick="game.setMode('RING_DUO')">
-                                <h3 class="margin-v-10">KOOP</h3>
-                                <p class="controls-hint">P1: WASD<br>P2: Pfeile</p>
-                            </button>
-                            <button id="mode-ring-trio" class="mode-card" type="button" onclick="game.setMode('RING_TRIO')">
-                                <h3 class="margin-v-10">TRIO</h3>
-                                <p class="controls-hint">P1: WASD<br>P2: Pfeile<br>P3: HBNM</p>
-                            </button>
-                        </div>
+                <!-- Über / Credits -->
+                <section class="menu-screen" data-screen="credits">
+                    <div class="topbar">
+                        <button class="btn-icon" type="button" onclick="MenuFlow.back()" title="Zurück">←</button>
+                        <div class="topbar__title">Über</div>
+                        <div class="topbar__spacer"></div>
                     </div>
-
-                    <button id="ring-force-btn" class="btn-secondary" type="button" onclick="game.startRingForcePrototype()">RING-FORCE PROTOTYP</button>
-                    <button class="btn-primary" type="button" onclick="game.startPartyLobby()" style="background: var(--primary); color: #000; font-weight: bold; margin-top: 10px;">PARTY MODUS STARTEN</button>
-                    <p class="text-hint margin-v-10">Hoste ein Spiel: Andere scannen den Code und steuern mit.</p>
-                    <button id="audio-init-btn" class="btn-audio" onclick="game.initAudio()">Audio aktivieren</button>
-                    
-                    <h3 class="title-sub">Levelauswahl</h3>
-                    <div id="level-select"></div>
-                    <button id="reset-progress-btn" class="btn-reset-progress" type="button" onclick="game.resetProgress()">Fortschritt zurücksetzen</button>
-                </div>
-
-                <div id="panel-labyrinth" class="menu-tab-panel">
-                    <div class="menu-screen-head">
-                        <div>
-                            <h1 class="title-main">LABYRINTH</h1>
-                            <p class="text-small">Nutze das Licht, um Feinde im Schatten zu vernichten.</p>
-                        </div>
-                        <button id="tab-classic" class="menu-switch-btn" type="button">SCHATTENJÄGER</button>
+                    <div class="credits-block">
+                        <h3>Version</h3>
+                        <p>0.9.0</p>
                     </div>
-
-                    <h3 class="title-sub mode-group-title">RINGS</h3>
-                    <div class="mode-group">
-                        <div class="mode-selection">
-                            <button id="mode-lab-solo" class="mode-card" type="button" onclick="game.setMode('LABYRINTH_RING_SOLO')">
-                                <h3 class="margin-v-10">SOLO</h3>
-                                <p class="controls-hint">Neuer Levelsatz fuer 1 Spieler</p>
-                            </button>
-                            <button id="mode-lab-duo" class="mode-card" type="button" onclick="game.setMode('LABYRINTH_RING_DUO')">
-                                <h3 class="margin-v-10">KOOP</h3>
-                                <p class="controls-hint">Neuer Levelsatz fuer 2 Spieler</p>
-                            </button>
-                            <button id="mode-lab-trio" class="mode-card" type="button" onclick="game.setMode('LABYRINTH_RING_TRIO')">
-                                <h3 class="margin-v-10">TRIO</h3>
-                                <p class="controls-hint">Neuer Levelsatz fuer 3 Spieler</p>
-                            </button>
-                        </div>
+                    <div class="credits-block">
+                        <h3>Spiel</h3>
+                        <p>Schatten-Jäger &amp; Panik-Lauf</p>
+                        <p class="dim">Ein HTML5-Spiel über Licht, Schatten und Panik.</p>
                     </div>
+                    <div class="credits-block">
+                        <h3>Mitwirkende</h3>
+                        <p>Bernd Button — Spieldesign &amp; Entwicklung</p>
+                        <p class="dim">Mit Unterstützung durch Claude Code.</p>
+                    </div>
+                    <div class="credits-block">
+                        <h3>Danksagung</h3>
+                        <p class="dim">An alle Testspieler und Familienmitglieder, die mitgespielt und mitgefiebert haben.</p>
+                    </div>
+                    <div class="credits-block">
+                        <h3>Rechtliches</h3>
+                        <p class="dim">Impressum und Datenschutzerklärung findest du in den Einstellungen.</p>
+                    </div>
+                </section>
 
-                    <button class="btn-secondary" type="button" onclick="game.startRingForcePrototype()">RING-FORCE PROTOTYP</button>
-                    <button class="btn-primary" type="button" onclick="game.startPartyLobby()" style="background: var(--primary); color: #000; font-weight: bold; margin-top: 10px;">PARTY MODUS STARTEN</button>
-                    <p class="text-hint margin-v-10">Hoste ein Spiel: Andere scannen den Code und steuern mit.</p>
-
-                    <h3 class="title-sub">Levelauswahl</h3>                    <div id="labyrinth-level-select"></div>
-                    <button class="btn-reset-progress" type="button" onclick="game.resetProgress()">Fortschritt zurücksetzen</button>
-                </div>
+                <!-- Kompatibilitäts-Shims für game.js (nicht löschen) -->
+                <div id="panel-classic" hidden></div>
+                <div id="panel-labyrinth" hidden></div>
+                <button id="tab-classic" hidden></button>
+                <button id="tab-labyrinth" hidden></button>
+                <button id="audio-init-btn" hidden></button>
             </div>
         </div>
 
+        <!-- ============ WIN ============ -->
         <div id="win-overlay" class="overlay hidden">
-            <div class="ui-panel">
-                <h1 class="text-success title-main">LEVEL GESCHAFFT!</h1>
-                <p id="win-msg" class="margin-v-10">Ziel erreicht.</p>
-                <div id="win-best-msg" class="text-success margin-v-20"></div>
-                <button onclick="game.nextLevel()">Nächstes Level</button>
-                <button onclick="game.showMenu()">Menü</button>
+            <div class="app-shell app-shell--center">
+                <div class="result-panel result-panel--win">
+                    <div class="result-eyebrow">Geschafft</div>
+                    <h1 class="result-title">LEVEL GESCHAFFT</h1>
+                    <p id="win-msg" class="result-sub">Ziel erreicht.</p>
+                    <div id="win-best-msg" class="result-best"></div>
+                    <button class="btn-primary" type="button" onclick="game.nextLevel()">Nächstes Level</button>
+                    <button class="btn-secondary" type="button" onclick="game.showMenu()">Menü</button>
+                </div>
             </div>
         </div>
 
+        <!-- ============ LOSE ============ -->
         <div id="lose-overlay" class="overlay hidden">
-            <div class="ui-panel">
-                <h1 id="lose-title" class="text-danger title-main">GESTORBEN!</h1>
-                <p id="lose-msg" class="margin-v-20">Die Dunkelheit hat dich eingeholt.</p>
-                <button onclick="game.retry()">Nochmal</button>
-                <button id="skip-level-btn" onclick="game.skipLevel()">Level überspringen</button>
-                <button onclick="game.showMenu()">Menü</button>
+            <div class="app-shell app-shell--center">
+                <div class="result-panel result-panel--lose">
+                    <div class="result-eyebrow">Vorbei</div>
+                    <h1 id="lose-title" class="result-title">GESTORBEN</h1>
+                    <p id="lose-msg" class="result-sub">Die Dunkelheit hat dich eingeholt.</p>
+                    <button class="btn-primary" type="button" onclick="game.retry()">Nochmal</button>
+                    <button id="skip-level-btn" class="btn-secondary" type="button" onclick="game.skipLevel()">Level überspringen</button>
+                    <button class="btn-secondary" type="button" onclick="game.showMenu()">Menü</button>
+                </div>
             </div>
         </div>
 
+        <!-- ============ PARTY HOST ============ -->
         <div id="party-overlay" class="overlay hidden">
-            <div class="ui-panel">
-                <h1 class="title-main">PARTY LOBBY</h1>
-                <p id="party-host-subtitle" class="margin-v-10">Scanne den Code mit deinem Handy, um als Lichtspieler beizutreten.</p>
-                <div id="qrcode-container" class="margin-v-20 qrcode-shell"></div>
-                <div id="party-host-url" class="party-url margin-v-10"></div>
-                <div id="party-host-notice" class="text-hint margin-v-10">Host bleibt Spieler 1 und bewegt die Figur. Der erste Joiner steuert das Licht.</div>
-                <div id="player-list" class="margin-v-20">
-                    <div id="player-status-2" class="text-hint">Lichtspieler: wartet auf Verbindung...</div>
-                    <div id="player-status-3" class="text-hint">Reserve: frei</div>
+            <div class="app-shell app-shell--center">
+                <div class="party-panel">
+                    <div class="topbar">
+                        <div class="topbar__spacer"></div>
+                        <div class="topbar__title">Party-Lobby</div>
+                        <div class="topbar__spacer"></div>
+                    </div>
+                    <p id="party-host-subtitle" class="hint">Scanne den Code mit deinem Handy, um als Lichtspieler beizutreten.</p>
+                    <div id="qrcode-container" class="qrcode-shell"></div>
+                    <div id="party-host-url" class="party-url"></div>
+                    <div id="party-host-notice" class="hint">Host bleibt Spieler 1 und bewegt die Figur. Der erste Joiner steuert das Licht.</div>
+                    <div class="player-list">
+                        <div id="player-status-2" class="player-row"><div class="player-dot"></div>Lichtspieler: wartet auf Verbindung...</div>
+                        <div id="player-status-3" class="player-row"><div class="player-dot"></div>Reserve: frei</div>
+                    </div>
+                    <div id="party-host-countdown" class="party-countdown hidden">3</div>
+                    <button id="close-lobby-btn" class="btn-secondary" type="button" onclick="game.closeLobbyAndStart()">Einladungen schließen</button>
+                    <button id="start-party-game-btn" class="btn-primary" type="button" onclick="game.startPartyGame()" disabled>Spiel starten</button>
+                    <button class="btn-secondary" type="button" onclick="game.showMenu()">Abbrechen</button>
                 </div>
-                <div id="party-host-countdown" class="party-countdown hidden">3</div>
-                <button id="close-lobby-btn" onclick="game.closeLobbyAndStart()">Einladungen schliessen</button>
-                <button id="start-party-game-btn" onclick="game.startPartyGame()" disabled>Spiel starten</button>
-                <button onclick="game.showMenu()" class="btn-secondary">Abbrechen</button>
             </div>
         </div>
 
+        <!-- ============ PARTY JOIN ============ -->
         <div id="party-join-overlay" class="overlay hidden">
-            <div class="ui-panel join-panel">
-                <div class="join-badge">HANDY CONTROLLER</div>
-                <h1 id="party-join-title" class="title-main">SESSION WIRD VERBUNDEN</h1>
-                <p id="party-join-status" class="margin-v-10">Verbinde mit dem Host...</p>
-                <p id="party-join-detail" class="text-small margin-v-10">Bleib auf dieser Seite. Du siehst hier den Warteraum und den Start des Spiels.</p>
-                <div id="party-join-role" class="party-role-card hidden">
-                    <div class="party-role-label">DEINE ROLLE</div>
-                    <div id="party-join-role-name" class="party-role-name">LICHT</div>
-                    <div id="party-join-role-hint" class="text-hint">Du drehst das Licht mit dem rechten Stick.</div>
-                </div>
-                <div id="party-join-countdown" class="party-countdown hidden">3</div>
-                <div id="party-controller-surface" class="party-controller-surface hidden">
-                    <div class="party-surface-title">CONTROLLER BEREIT</div>
-                    <div id="party-controller-hint" class="text-hint">Nutze den rechten Stick, um das Licht zu drehen.</div>
+            <div class="app-shell app-shell--center">
+                <div class="join-panel">
+                    <div class="join-badge">HANDY CONTROLLER</div>
+                    <h1 id="party-join-title" class="result-title">SESSION WIRD VERBUNDEN</h1>
+                    <p id="party-join-status" class="result-sub">Verbinde mit dem Host...</p>
+                    <p id="party-join-detail" class="hint">Bleib auf dieser Seite. Du siehst hier den Warteraum und den Start des Spiels.</p>
+                    <div id="party-join-role" class="party-role-card hidden">
+                        <div class="party-role-label">DEINE ROLLE</div>
+                        <div id="party-join-role-name" class="party-role-name">LICHT</div>
+                        <div id="party-join-role-hint" class="hint">Du drehst das Licht mit dem rechten Stick.</div>
+                    </div>
+                    <div id="party-join-countdown" class="party-countdown hidden">3</div>
+                    <div id="party-controller-surface" class="party-controller-surface hidden">
+                        <div class="party-surface-title">CONTROLLER BEREIT</div>
+                        <div id="party-controller-hint" class="hint">Nutze den rechten Stick, um das Licht zu drehen.</div>
+                    </div>
                 </div>
             </div>
         </div>
 
+        <!-- ============ ROTATE HINT ============ -->
         <div id="rotate-device-overlay" class="overlay hidden">
-            <div class="ui-panel rotate-panel">
-                <div class="rotate-badge">MOBILE MODUS</div>
-                <h1 class="title-main">BITTE HOCHKANT HALTEN</h1>
-                <p class="margin-v-10">Auf Handys laeuft Schatten-Jaeger jetzt im Hochformat.</p>
-                <p class="text-small">Drehe dein Geraet ins Portrait-Format, damit Steuerung, Level-Framing und Labyrinth-Pfade korrekt geladen werden.</p>
+            <div class="app-shell app-shell--center">
+                <div class="rotate-panel">
+                    <div class="rotate-badge">MOBILE MODUS</div>
+                    <h1 class="result-title">BITTE HOCHKANT HALTEN</h1>
+                    <p class="hint">Auf Handys läuft Schatten-Jäger im Hochformat.</p>
+                    <p class="hint">Drehe dein Gerät ins Portrait-Format, damit Steuerung und Layout korrekt geladen werden.</p>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Script-Reihenfolge ist wichtig, da game.js auf LEVELS zugreift -->
+    <!-- Script-Reihenfolge ist wichtig: levels.js vor game.js -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="levels.js"></script>
     <script src="game.js"></script>
+
+    <script>
+    /* ============================================================
+       MenuFlow — Bildschirm-Navigation für das neue 3-Schritt-Menü.
+       game.js bleibt als Engine unverändert; MenuFlow ruft setMode,
+       startPartyLobby etc. an den passenden Stellen auf.
+       ============================================================ */
+    const MenuFlow = {
+        state: { game: null, prev: 'main', device: null },
+
+        init() {
+            this.state.device = localStorage.getItem('sj_device');
+            const startScreen = this.state.device ? 'main' : 'device';
+            this.show(startScreen);
+
+            // Audio bei erster Interaktion auto-starten (Browser brauchen Gesture)
+            const initAudioOnce = () => {
+                if (window.game && typeof game.initAudio === 'function') game.initAudio();
+                document.removeEventListener('pointerdown', initAudioOnce);
+            };
+            document.addEventListener('pointerdown', initAudioOnce);
+
+            // game.showMenu wrappen, damit wir nach Spielende zurück auf 'main' landen
+            if (window.game && typeof game.showMenu === 'function') {
+                const orig = game.showMenu.bind(game);
+                game.showMenu = () => {
+                    orig();
+                    MenuFlow.show('main');
+                };
+            }
+
+            // Hintergrund-Overlay-Image aus game.js neutralisieren
+            // (game.setMenuTab setzt es per Inline-Style — wir wollen unser CSS-Theme)
+            const overlay = document.getElementById('menu-overlay');
+            if (overlay) {
+                const observer = new MutationObserver(() => {
+                    if (overlay.style.backgroundImage) overlay.style.backgroundImage = '';
+                });
+                observer.observe(overlay, { attributes: true, attributeFilter: ['style'] });
+            }
+        },
+
+        show(screen) {
+            const cur = document.querySelector('.menu-screen.active');
+            if (cur && cur.dataset.screen !== screen) this.state.prev = cur.dataset.screen;
+            document.querySelectorAll('.menu-screen').forEach(s => s.classList.remove('active'));
+            const target = document.querySelector(`.menu-screen[data-screen="${screen}"]`);
+            if (target) target.classList.add('active');
+
+            // Theme nach Kontext setzen
+            const shell = document.getElementById('app-shell');
+            if (screen === 'mode-shadow' || screen === 'level-shadow') {
+                shell.dataset.theme = 'shadow';
+            } else if (screen === 'mode-panic' || screen === 'level-panic') {
+                shell.dataset.theme = 'panic';
+            } else {
+                shell.removeAttribute('data-theme');
+            }
+
+            // Scroll an den Anfang
+            const overlay = document.getElementById('menu-overlay');
+            if (overlay) overlay.scrollTop = 0;
+        },
+
+        back() { this.show(this.state.prev || 'main'); },
+
+        selectDevice(d) {
+            this.state.device = d;
+            localStorage.setItem('sj_device', d);
+            this.show('main');
+        },
+
+        selectGame(g) {
+            this.state.game = g;
+            // Default-Modus pro Spiel setzen, damit Levellisten korrekt rendern
+            if (window.game) {
+                game.setMode(g === 'shadow' ? 'SOLO' : 'LABYRINTH_RING_SOLO');
+            }
+            this.show(g === 'shadow' ? 'mode-shadow' : 'mode-panic');
+        },
+
+        selectMode(mode) {
+            if (window.game) game.setMode(mode); // re-rendert Levels intern
+            const isPanic = mode.startsWith('LABYRINTH_');
+            this.show(isPanic ? 'level-panic' : 'level-shadow');
+        },
+
+        startParty() {
+            if (window.game) game.startPartyLobby();
+        },
+
+        startTraining() {
+            if (window.game) game.startRingForcePrototype();
+        },
+
+        toggleSetting(el, key) {
+            el.classList.toggle('on');
+            // TODO: hier später echte Settings persistieren / anwenden
+        }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => MenuFlow.init());
+    </script>
 </body>
 </html>

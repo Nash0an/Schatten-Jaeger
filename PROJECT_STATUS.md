@@ -1,42 +1,60 @@
 # Projektstatus: Schatten-Jäger
 
-## Aktueller Stand
-Das Projekt hat einen großen visuellen und strukturellen Sprung gemacht:
-- **Grafik:** Modus-spezifische High-Res Hintergründe sind integriert.
-- **Labyrinth:** Der Parkour hat eine Holzsteg-Optik und organischere, breitere Wege (Sinus-basiert).
-- **Beleuchtung:** Licht- und Schatten-Balance sind für maximale Atmosphäre feinjustiert.
-- **Struktur:** Dateistruktur ist für Assets professionalisiert (`assets/images/`).
-- **Stabilität:** Klassisches Hauptspiel und Labyrinth sind stabil und visuell auf einem Niveau.
+## Aktueller Stand (V2.7.0)
+Das Menü- und Design-System ist auf einen neuen Stand gehoben:
+- **3-Schritt-Menü:** Gerät → Spiel → Modus → Level, plus eigene Screens für Einstellungen und Credits.
+- **Zwei Spielkarten:** `Schatten-Jäger` und `Panik-Lauf` mit animierten Inline-SVG-Logos.
+- **Per-Game-Theming:** `[data-theme="shadow"|"panic"]` steuert Akzentfarben (Bernstein vs. Honig/Holz).
+- **Design-System:** Bebas Neue + Inter, CSS-Tokens, einheitliche Touch-Größen und responsive Breakpoints.
+- **Kompatibilitätsschicht:** `game.js` bleibt unverändert; versteckte `panel-classic`/`panel-labyrinth`-Elemente und Tabs dienen als Brücke.
+- **Gameplay weiter stabil:** Klassisches Hauptspiel und Panik-Lauf (Labyrinth intern) laufen wie vor der UI-Überarbeitung.
 
 ## Spielbare Zweige
 - `SOLO` / `COOP` (Klassisch)
 - `RING_SOLO` / `RING_DUO` / `RING_TRIO` (Standard-Level)
-- `LABYRINTH_RING_SOLO / DUO / TRIO` (Parkour-Modus)
+- `LABYRINTH_RING_SOLO / DUO / TRIO` (Panik-Lauf)
 - `RING_FORCE`-Sandbox
+- Party (aktuell immer klassisches `COOP`)
 
-## Was zuletzt gebaut wurde
-- **Dynamisches Hintergrundsystem:** Automatischer Wechsel zwischen Classic- und Labyrinth-Hintergrund.
-- **Asset-Reorganisation:** Einführung von `assets/images/` und saubere Benennung.
-- **Labyrinth-Upgrade:** 50% breitere Wege, Sinus-Kurven-Generierung für flüssigeres Gameplay.
-- **Texturierung:** Holzsteg-Textur für Labyrinth-Pfade mit Tiefeneffekten.
-- **UI-Polishing:** Exakte Zentrierung der Menü-Buttons und Vereinheitlichung der Panel-Breite auf 700px.
-- **Atmosphäre:** Hellere Lampe, dunklere Schattenkanten, aufgehelltes Spielfeld.
+## Was zuletzt gebaut wurde (V2.7.0)
+- **Menü-Neubau:** 3-Schritt-Flow, eigene Back-Buttons, Gerätewahl, Einstellungen, Credits.
+- **Design-System:** Neue `index.html`-Struktur plus komplette `styles.css`-Neufassung.
+- **MenuFlow-Controller:** Navigations-, Theming- und Integrationsschicht in `index.html`.
+- **MutationObserver:** Neutralisiert Inline-Hintergründe, die `game.js` am Overlay setzt.
+- **Gerätepräferenz:** `sj_device` in `localStorage`.
+
+## Was zuletzt gebaut wurde (V2.6.0)
+- Dynamisches Hintergrund-System (Classic/Labyrinth).
+- Asset-Reorganisation unter `assets/images/`.
+- Breitere, organischere Labyrinth-Pfade mit Holztextur.
+- Mobile-Portrait-Runtime mit Rotate-Overlay.
+- Party-Modus v1 (QR-Join, Lobby, Countdown) für klassisches `COOP`.
 
 ## Was stabil ist
 - Kern-Gameplay (Physik, Steuerung, Kollision).
-- Labyrinth-Engine (Countdown, Zeitlimits, Zielerkennung).
-- Speichersystem (localStorage Progression).
-- UI-Navigation und Modusumschaltung.
+- Labyrinth-/Panik-Lauf-Engine (Countdown, Zeitlimits, Zielerkennung).
+- Speichersystem (`sj_v2_data` in `localStorage`).
+- UI-Navigation, Modusumschaltung, Theming.
+
+## Bekannte offene Punkte
+- **Party aus Panik-Lauf-Menü** startet derzeit Schatten-Jäger COOP.
+- **Einstellungs-Toggles** (Audio, Shake, Reduzierte Bewegung) sind noch nicht persistent.
+- **Locked-State im Level-Grid** fehlt — `game.js` rendert alle Level anwählbar.
+- **Pause-Menü** im Spielbildschirm ist noch nicht auf das neue Design-System umgestellt.
+- **In-Game-HUD-Feinschliff** steht noch aus.
+- Labyrinth-Zeiten für `DUO`/`TRIO` bleiben der wichtigste Balancing-Punkt.
 
 ## Was als Nächstes ansteht (Vision)
-- **Grafik:** Spezialisierte Texturen für Gegner oder Sammelziele (Kirschen).
-- **Level:** Handgebaute Speziallevel für das Labyrinth statt reiner Algorithmen.
-- **Tuning:** Feinschliff an den Zeitlimits und Level-Eigenschaften.
-- **Audio:** Ausbau der Soundeffekte und atmosphärische Hintergrundgeräusche.
-- **Gameplay:** Neue Power-Ups oder dynamische Hindernisse.
+- **Party-Routing:** Party aus Panik-Lauf auf Labyrinth-Modus führen.
+- **Settings-Persistenz:** Toggles in `localStorage` speichern und auf Audio/Shake/Motion anwenden.
+- **Level-Grid:** Locked-State explizit rendern, Fortschritt visueller machen.
+- **Pause-/HUD-Polish:** In-Game-Overlays in das neue Design-System überführen.
+- **Handgebaute Panik-Lauf-Level** statt reiner Algorithmen.
+- **Audio-Ausbau:** mehr Soundeffekte, atmosphärische Ambient-Layer.
 
 ## Wichtigste Dokumentation
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - [docs/DEV_HANDOFF.md](docs/DEV_HANDOFF.md)
 - [docs/QUICK_CONTEXT.md](docs/QUICK_CONTEXT.md)
 - [docs/CHANGELOG.md](docs/CHANGELOG.md)
+- [DESIGN-REGELN.md](DESIGN-REGELN.md)

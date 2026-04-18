@@ -151,22 +151,32 @@ Dieser Bereich ist aktuell der wichtigste Balancing-Punkt im Projekt.
 - Wird die erlaubte Distanz überschritten, gilt der Ring als heruntergefallen.
 - Das Ziel zählt nur bei genügend Fortschritt plus Nähe zum Finishpunkt.
 
-## 9. Menü
-Das Menü nutzt zwei Panels:
-- `panel-classic`
-- `panel-labyrinth`
+## 9. Menü (V2.7.0)
+Das Menü ist dreistufig und lebt in `index.html` als mehrere `.menu-screen`-Sections. Gesteuert wird alles über den `MenuFlow`-Controller am Ende von `index.html`.
 
-Der Wechsel erfolgt über `setMenuTab()`.
+### Fluss
+1. `device` — Gerätewahl (einmalig, speichert `sj_device` in `localStorage`).
+2. `main` — Spielwahl mit zwei Karten: `Schatten-Jäger` und `Panik-Lauf`.
+3. `mode-shadow` / `mode-panic` — Modusauswahl pro Spiel.
+4. `level-shadow` / `level-panic` — Levelauswahl pro Spiel.
 
-### Classic-Panel
-- klassische Hauptmodi
-- Ring-Modi
-- Hauptlevelauswahl
+Zusätzlich erreichbar aus dem Hauptscreen:
+- `settings` — Toggles für Audio, Screen-Shake, Reduzierte Bewegung (aktuell UI-only).
+- `credits`
 
-### Labyrinth-Panel
-- eigene Überschrift `LABYRINTH`
-- nur `RINGS`-Gruppe
-- eigene Labyrinth-Levelauswahl
+### Theming
+`#app-shell[data-theme="shadow"]` und `#app-shell[data-theme="panic"]` schalten die Akzentfarben in `styles.css` um. `MenuFlow.show(screen)` setzt das Attribut je nach Screen.
+
+### Kompatibilitätsschicht zu `game.js`
+`game.js` wurde nicht umgebaut. Die alten Hooks bleiben als versteckte Stubs in `index.html`:
+- `#panel-classic`, `#panel-labyrinth`
+- `#tab-classic`, `#tab-labyrinth`
+- `#audio-init-btn`
+
+`MenuFlow` delegiert Spielstarts an vorhandene `game.js`-Methoden (`setMode()`, `startLevel()`, `startPartyLobby()`, `startRingForcePrototype()` usw.). Levelbuttons werden weiterhin von `game.js` (`renderLevelSelect()`) erzeugt und durch die neuen Grid-/Button-Styles gerendert (`.lvl-btn.completed`, `.lvl-btn.current-target`, `span.best`).
+
+### Overlay-Hintergrund
+`game.js` setzt auf `#menuOverlay.style.backgroundImage` ein Motiv. Das neue Layout überschreibt das per `background-image: none !important` und neutralisiert Inline-Änderungen zusätzlich mit einem `MutationObserver` im `MenuFlow`.
 
 ## 10. Progression und Savegame
 - Savegame-Key: `sj_v2_data`
@@ -242,12 +252,16 @@ Für `LABYRINTH_RING_DUO` und `LABYRINTH_RING_TRIO` gibt es noch kein wirklich g
 - Klassisches Hauptspiel mit `SOLO` und `COOP`.
 - Ring-Modi in normalen Levels.
 - Direkte Levelwahl und Skip-Logik.
-- Separater Labyrinth-Menüfluss.
-- Labyrinth-Grundengine mit Countdown, Zeitlimit, Absturz und Ziel.
+- Neues 3-Schritt-Menü mit Per-Game-Theming.
+- Labyrinth-/Panik-Lauf-Grundengine mit Countdown, Zeitlimit, Absturz und Ziel.
 - Mobile Portrait-Gameplay mit Rotate-Overlay, neuem Framing und Labyrinth-Laufzeitrotation.
 - Party-Modus v1 fuer klassisches `COOP` mit Host-Lobby, QR-Join, Warteraum und Start-Countdown.
 
 ### Offen
+- Party aus dem Panik-Lauf-Menü startet aktuell Schatten-Jäger `COOP`.
+- Einstellungs-Toggles sind UI-only, keine Persistenz.
+- Kein expliziter Locked-Zustand im Level-Grid.
+- Pause-Menü und In-Game-HUD noch nicht auf das neue Design-System überführt.
 - Labyrinth-Zeiten vor allem für `DUO` und `TRIO`.
 - Qualität der generierten Labyrinth-Kurse.
 - Touch-Konzept für mehr als einen Ring-Spieler im Labyrinth.
